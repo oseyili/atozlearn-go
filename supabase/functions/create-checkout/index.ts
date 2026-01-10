@@ -3,47 +3,50 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!; // auto-provided by Supabase runtime
+const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
 const SITE_URL = Deno.env.get("SITE_URL")!;
 
 const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-11-20" });
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
   try {
-    if (req.method !== "POST") return json({ error: "Use POST" }, 405);
-
-    // Require user auth (frontend sends Bearer token)
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Missing Authorization" }, 401);
-
-    // Verify user from token
-    const anon = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!anon) return json({ error: "Missing SUPABASE_ANON_KEY secret" }, 500);
-
-    const userClient = createClient(SUPABASE_URL, anon, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
-
-    const user_id = userData.user.id;
-    const email = userData.user.email ?? undefined;
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Missing Bearer token" }, 401);
 
     const { course_id } = await req.json();
     if (!course_id) return json({ error: "Missing course_id" }, 400);
 
-    // Server-side admin client (bypasses RLS safely here)
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // Create user-scoped client using the incoming JWT
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    // Ensure enrollment exists (idempotent)
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) return json({ error: "Invalid JWT" }, 401);
+
+    const user_id = userData.user.id;
+    const email = userData.user.email ?? undefined;
+
+    // Admin client for controlled DB writes
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+    // Ensure enrollment exists
     await admin.from("enrollments").upsert({
       user_id,
       course_id,
@@ -51,7 +54,7 @@ Deno.serve(async (req) => {
       payment_status: "unpaid",
     });
 
-    // Create Stripe Checkout session (one-time payment)
+    // Create Checkout session
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: email,
@@ -60,11 +63,8 @@ Deno.serve(async (req) => {
           quantity: 1,
           price_data: {
             currency: "gbp",
-            unit_amount: 499, // £4.99 - change later
-            product_data: {
-              name: "AtoZlearn-go Course Access",
-              description: "Unlock lessons for this course",
-            },
+            unit_amount: 499,
+            product_data: { name: "AtoZlearn-go Course Access" },
           },
         },
       ],
