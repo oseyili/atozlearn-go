@@ -47,3 +47,6 @@ async function startPayment() {
     setBusy(false);
   }
 }
+
+export default App;
+
