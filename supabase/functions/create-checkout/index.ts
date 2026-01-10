@@ -2,14 +2,13 @@ import Stripe from "https://esm.sh/stripe@14?target=denonext";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
+const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET"); // not used here, ok if unset
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SITE_URL = Deno.env.get("SITE_URL")!;
 
-const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20",
-});
+const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-11-20" });
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,10 +20,7 @@ const corsHeaders = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      ...corsHeaders,
-    },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 }
 
@@ -35,27 +31,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (req.method !== "POST") {
-      return json({ error: "Method not allowed" }, 405);
-    }
+    if (req.method !== "POST") return json({ error: "Use POST" }, 405);
 
-    const authHeader = req.headers.get("authorization");
-    const apiKey = req.headers.get("apikey");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return json({ error: "Missing Authorization header" }, 401);
-    }
-
-    if (!apiKey) {
-      return json({ error: "Missing apikey header" }, 401);
+    const authHeader = req.headers.get("authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return json({ error: "Missing Authorization Bearer token" }, 401);
     }
 
     const { course_id } = await req.json();
-    if (!course_id) {
-      return json({ error: "Missing course_id" }, 400);
-    }
+    if (!course_id) return json({ error: "Missing course_id" }, 400);
 
-    // 🔐 User-scoped client (JWT validation happens here)
+    // ✅ Validate the user JWT (this must be done with anon key + JWT header)
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
         headers: {
@@ -65,28 +51,28 @@ Deno.serve(async (req) => {
       },
     });
 
-    const { data: userData, error: userError } =
-      await userClient.auth.getUser();
-
-    if (userError || !userData?.user) {
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
       return json({ error: "Invalid JWT" }, 401);
     }
 
     const user_id = userData.user.id;
     const email = userData.user.email ?? undefined;
 
-    // 🔑 Admin client for DB writes
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    // ✅ Server-side admin writes
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Ensure enrollment row exists
-    await admin.from("enrollments").upsert({
+    // Ensure enrollment exists (idempotent)
+    const { error: upsertErr } = await admin.from("enrollments").upsert({
       user_id,
       course_id,
       is_paid: false,
       payment_status: "unpaid",
     });
 
-    // 💳 Create Stripe Checkout
+    if (upsertErr) return json({ error: upsertErr.message }, 400);
+
+    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: email,
@@ -98,29 +84,27 @@ Deno.serve(async (req) => {
             unit_amount: 499,
             product_data: {
               name: "AtoZlearn-go Course Access",
+              description: "Unlock lessons for this course",
             },
           },
         },
       ],
       success_url: `${SITE_URL}/courses/${course_id}?paid=1`,
       cancel_url: `${SITE_URL}/courses/${course_id}?canceled=1`,
-      metadata: {
-        user_id,
-        course_id,
-      },
+      metadata: { user_id, course_id },
     });
 
-    await admin
+    // Store Stripe session id
+    const { error: updErr } = await admin
       .from("enrollments")
       .update({ stripe_session_id: session.id })
       .eq("user_id", user_id)
       .eq("course_id", course_id);
 
-    return json({ url: session.url });
-  } catch (err) {
-    return json(
-      { error: err instanceof Error ? err.message : String(err) },
-      500
-    );
+    if (updErr) return json({ error: updErr.message }, 400);
+
+    return json({ url: session.url }, 200);
+  } catch (e) {
+    return json({ error: String(e?.message ?? e) }, 500);
   }
 });
