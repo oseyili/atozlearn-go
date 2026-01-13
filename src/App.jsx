@@ -8,14 +8,14 @@ async function startPayment() {
   setErr("");
 
   try {
-    // ✅ force a fresh token right before payment
-    const { data: s, error: sErr } = await supabase.auth.getSession();
-    if (sErr) throw sErr;
+    // ✅ Always refresh right before payment (fixes "token is expired")
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+    if (refreshErr) throw refreshErr;
 
-    const token = s?.session?.access_token;
-    if (!token) throw new Error("You are not signed in. Please sign out and sign in again.");
+    const token = refreshed?.session?.access_token;
+    if (!token) throw new Error("Session expired. Please sign out and sign in again.");
 
-    // ✅ invoke WITH Authorization header so it cannot be missing
+    // ✅ Call Edge Function via Supabase SDK, but force the fresh token header
     const { data, error } = await supabase.functions.invoke("create-checkout", {
       body: { course_id: id },
       headers: { Authorization: `Bearer ${token}` },
@@ -27,7 +27,7 @@ async function startPayment() {
       throw new Error(`Edge error ${status ?? ""}: ${body ?? error.message}`);
     }
 
-    if (!data?.url) throw new Error("No checkout URL returned.");
+    if (!data?.url) throw new Error("No checkout URL returned from server.");
     window.location.href = data.url;
   } catch (e) {
     setErr(e?.message || "Payment failed");
