@@ -27,6 +27,57 @@ function useQuery() {
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
+function subjectOf(course) {
+  return (course?.subject || course?.category || "General").toString().trim() || "General";
+}
+
+// Deterministic “thumbnail” gradient per course title/id (no extra DB fields needed)
+function thumbStyle(seed) {
+  let h = 0;
+  const s = (seed || "course").toString();
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  return {
+    background: `linear-gradient(135deg, hsla(${h}, 90%, 65%, .95), hsla(${(h + 45) % 360}, 90%, 60%, .95))`,
+  };
+}
+
+const SUBJECT_ICONS = {
+  Mathematics: "∑",
+  Science: "⚗",
+  "Computer Science": "⌘",
+  Engineering: "⚙",
+  "Data & AI": "🧠",
+  Cybersecurity: "🛡",
+  Business: "📈",
+  Finance: "💷",
+  Economics: "🏦",
+  "English & Writing": "✍",
+  History: "🏛",
+  Geography: "🗺",
+  Languages: "🌍",
+  "Arts & Design": "🎨",
+  Music: "🎵",
+  "Health & Wellness": "💪",
+  Psychology: "🧩",
+  Law: "⚖",
+  Medicine: "🩺",
+  Education: "🎓",
+  Marketing: "📣",
+  "Career Skills": "🧰",
+  "Exam Prep": "📝",
+  General: "📚",
+};
+
+async function fetchCourses(limit = 5000) {
+  const { data, error } = await supabase
+    .from("courses")
+    .select("id,title,description,subject,category,created_at")
+    .limit(limit);
+
+  if (error) throw error;
+  return uniqBy(data || [], (c) => c.id || `t:${c.title}`);
+}
+
 /* -------------------- App -------------------- */
 
 function App() {
@@ -67,7 +118,7 @@ function App() {
           <Route path="/" element={<MasterPortal session={session} />} />
           <Route path="/login" element={<Auth />} />
 
-          <Route path="/subjects" element={<SubjectsPage session={session} />} />
+          <Route path="/subjects" element={<SubjectsPage />} />
           <Route path="/subjects/:subject" element={<SubjectCourses session={session} />} />
 
           <Route path="/courses" element={<CoursesPage session={session} />} />
@@ -113,7 +164,6 @@ function Auth() {
   return (
     <section className="auth">
       <h2>Sign in / Sign up</h2>
-
       <div className="authBox">
         <label>Email</label>
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" />
@@ -131,58 +181,68 @@ function Auth() {
   );
 }
 
-/* -------------------- Data hooks -------------------- */
+/* -------------------- Enrollments + Progress -------------------- */
 
 function useEnrollments(session) {
   const [enrollments, setEnrollments] = useState([]);
-  const [err, setErr] = useState("");
 
   useEffect(() => {
-    if (!session?.user?.id) {
-      setEnrollments([]);
-      setErr("");
-      return;
-    }
-
+    if (!session?.user?.id) return void setEnrollments([]);
     (async () => {
-      setErr("");
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("enrollments")
         .select("course_id,is_paid,payment_status,created_at")
         .eq("user_id", session.user.id);
-
-      if (error) setErr(error.message);
       setEnrollments(data || []);
     })();
   }, [session?.user?.id]);
 
-  const map = useMemo(() => {
+  const enrollMap = useMemo(() => {
     const m = new Map();
     for (const e of enrollments) m.set(e.course_id, e);
     return m;
   }, [enrollments]);
 
-  return { enrollments, enrollMap: map, enrollErr: err };
+  return { enrollments, enrollMap };
 }
 
-async function fetchCourses(limit = 5000) {
-  const { data, error } = await supabase
-    .from("courses")
-    .select("id,title,description,subject,category,created_at")
-    .limit(limit);
+// Pull progress % if your progress table exists + RLS allows it.
+// Safe fallback: 0% if anything fails.
+function useProgress(session) {
+  const [progressMap, setProgressMap] = useState(new Map());
 
-  if (error) throw error;
+  useEffect(() => {
+    if (!session?.user?.id) return void setProgressMap(new Map());
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("progress")
+          .select("course_id,percent_complete,updated_at")
+          .eq("user_id", session.user.id);
 
-  // Dedupe safely (some seeds duplicate)
-  const cleaned = uniqBy(data || [], (c) => c.id || `t:${c.title}`);
-  return cleaned;
+        if (error) throw error;
+
+        const m = new Map();
+        for (const p of data || []) {
+          const pct = Math.max(0, Math.min(100, Number(p.percent_complete ?? 0)));
+          m.set(p.course_id, { pct, updated_at: p.updated_at });
+        }
+        setProgressMap(m);
+      } catch {
+        setProgressMap(new Map());
+      }
+    })();
+  }, [session?.user?.id]);
+
+  return progressMap;
 }
 
-/* -------------------- Master Portal -------------------- */
+/* -------------------- Master Portal (extended) -------------------- */
 
 function MasterPortal({ session }) {
   const nav = useNavigate();
-  const { enrollments, enrollMap } = useEnrollments(session);
+  const { enrollments } = useEnrollments(session);
+  const progressMap = useProgress(session);
 
   const [courses, setCourses] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -195,17 +255,14 @@ function MasterPortal({ session }) {
         const list = await fetchCourses(5000);
         setCourses(list);
 
-        // Build subject list from DB (fallback fields: subject or category)
         const subs = uniqBy(
-          list
-            .map((c) => (c.subject || c.category || "General").toString().trim())
-            .filter(Boolean),
+          list.map((c) => subjectOf(c)).filter(Boolean),
           (s) => s.toLowerCase()
         ).sort((a, b) => a.localeCompare(b));
 
         setSubjects(subs);
       } catch (e) {
-        setErr(e.message || "Failed to load portal data");
+        setErr(e.message || "Failed to load portal");
       }
     })();
   }, []);
@@ -213,7 +270,7 @@ function MasterPortal({ session }) {
   const paidCourses = useMemo(() => {
     if (!session?.user?.id) return [];
     const paidIds = new Set(
-      enrollments
+      (enrollments || [])
         .filter((e) => e.is_paid === true || e.payment_status === "paid")
         .map((e) => e.course_id)
     );
@@ -222,76 +279,78 @@ function MasterPortal({ session }) {
 
   return (
     <section>
-      <div className="portalHeader">
-        <div>
-          <h1 className="portalTitle">Master Portal</h1>
+      <div className="portalHero">
+        <div className="portalHeroLeft">
+          <div className="portalKicker">Master Portal</div>
+          <h1 className="portalTitle">Everything you need, in one place</h1>
           <p className="muted">
-            Subjects and courses are linked to your database. Paid courses appear automatically.
+            Subjects and courses load from your database. Paid courses unlock lessons automatically.
           </p>
-          {session ? (
-            <div className="pill ok">Signed in: {session.user.email}</div>
-          ) : (
-            <div className="pill warn">Sign in to see your paid courses</div>
-          )}
+
+          <div className="portalMeta">
+            {session ? (
+              <span className="pill ok">Signed in: {session.user.email}</span>
+            ) : (
+              <span className="pill warn">Sign in to see paid courses</span>
+            )}
+            <span className="pill">Database-driven</span>
+            <span className="pill">Secure payments</span>
+            <span className="pill">Progress tracking</span>
+          </div>
+
+          <div className="portalActions">
+            <button className="cta" onClick={() => nav("/subjects")}>Browse Subjects</button>
+            <button className="btn" onClick={() => nav("/courses")}>Browse Courses</button>
+          </div>
         </div>
 
-        <div className="portalActions">
-          <button className="btn" onClick={() => nav("/subjects")}>Browse Subjects</button>
-          <button className="cta" onClick={() => nav("/courses")}>Browse Courses</button>
+        <div className="portalHeroRight">
+          <div className="heroCard">
+            <div className="heroCardTitle">Quick Start</div>
+            <ol className="heroSteps">
+              <li>Open a Subject</li>
+              <li>Select a Course</li>
+              <li>Enroll & Pay</li>
+              <li>Continue lessons</li>
+            </ol>
+            <div className="heroTip">
+              Tip: Paid courses will appear below automatically.
+            </div>
+          </div>
         </div>
       </div>
 
       {err && <div className="notice error">{err}</div>}
 
-      {/* TABLE 1: SUBJECTS */}
-      <div className="tableCard">
-        <div className="tableTitleRow">
-          <h2>Subjects</h2>
-          <div className="muted">Click a subject to view its courses</div>
-        </div>
-
-        <div className="tableWrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Courses</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {subjects.map((s) => {
-                const count = courses.filter(
-                  (c) => (c.subject || c.category || "General").toString().trim() === s
-                ).length;
-
-                return (
-                  <tr key={s}>
-                    <td className="tdStrong">{s}</td>
-                    <td className="muted">{count}</td>
-                    <td className="tdRight">
-                      <Link className="linkBtn" to={`/subjects/${encodeURIComponent(s)}`}>
-                        Open →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-              {subjects.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="muted">No subjects found yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* SUBJECTS GRID (cards with icons) */}
+      <div className="sectionRow">
+        <h2>Subjects</h2>
+        <div className="muted">Click a subject to view courses</div>
       </div>
 
-      {/* TABLE 2: PAID COURSES */}
+      <div className="subjectGrid">
+        {subjects.map((s) => {
+          const icon = SUBJECT_ICONS[s] || SUBJECT_ICONS.General;
+          const count = courses.filter((c) => subjectOf(c) === s).length;
+          return (
+            <Link key={s} to={`/subjects/${encodeURIComponent(s)}`} className="subjectCard">
+              <div className="subjectIcon">{icon}</div>
+              <div className="subjectInfo">
+                <div className="subjectTitle">{s}</div>
+                <div className="muted">{count} courses</div>
+              </div>
+              <div className="subjectArrow">→</div>
+            </Link>
+          );
+        })}
+        {subjects.length === 0 && <div className="notice">No subjects found yet.</div>}
+      </div>
+
+      {/* PAID COURSES TABLE (with progress) */}
       <div className="tableCard">
         <div className="tableTitleRow">
           <h2>Paid Courses</h2>
-          <div className="muted">These are unlocked for you</div>
+          <div className="muted">Continue where you left off</div>
         </div>
 
         {!session && <div className="notice">Sign in to view your paid courses.</div>}
@@ -303,26 +362,45 @@ function MasterPortal({ session }) {
                 <tr>
                   <th>Course</th>
                   <th>Subject</th>
-                  <th>Paid</th>
+                  <th>Progress</th>
+                  <th>Last updated</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {paidCourses.map((c) => (
-                  <tr key={c.id}>
-                    <td className="tdStrong">{c.title}</td>
-                    <td className="muted">{(c.subject || c.category || "General").toString()}</td>
-                    <td>
-                      <span className="status ok">PAID</span>
-                    </td>
-                    <td className="tdRight">
-                      <Link className="linkBtn" to={`/courses/${c.id}`}>Open →</Link>
-                    </td>
-                  </tr>
-                ))}
+                {paidCourses.map((c) => {
+                  const p = progressMap.get(c.id);
+                  const pct = p?.pct ?? 0;
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <div className="rowCourse">
+                          <div className="thumb" style={thumbStyle(c.id || c.title)} />
+                          <div>
+                            <div className="tdStrong">{c.title}</div>
+                            <div className="muted">{c.description}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="muted">{subjectOf(c)}</td>
+                      <td>
+                        <div className="progressWrap">
+                          <div className="progressBar">
+                            <div className="progressFill" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="muted">{pct}%</div>
+                        </div>
+                      </td>
+                      <td className="muted">{p?.updated_at ? fmtDate(p.updated_at) : "-"}</td>
+                      <td className="tdRight">
+                        <Link className="linkBtn" to={`/courses/${c.id}`}>Continue →</Link>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {paidCourses.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="muted">
+                    <td colSpan={5} className="muted">
                       No paid courses yet. Go to Courses → open a course → Enroll & Pay.
                     </td>
                   </tr>
@@ -332,27 +410,13 @@ function MasterPortal({ session }) {
           </div>
         )}
       </div>
-
-      {/* Quick access */}
-      <div className="quickRow">
-        <div className="quickCard">
-          <div className="quickTitle">All Courses</div>
-          <div className="muted">Search and open any course</div>
-          <Link className="cta" to="/courses">Open Courses</Link>
-        </div>
-        <div className="quickCard">
-          <div className="quickTitle">Support</div>
-          <div className="muted">Help is shown inside each course page</div>
-          <Link className="btn" to="/courses">Go to a course</Link>
-        </div>
-      </div>
     </section>
   );
 }
 
-/* -------------------- Subjects page -------------------- */
+/* -------------------- Subjects Page -------------------- */
 
-function SubjectsPage({ session }) {
+function SubjectsPage() {
   const [courses, setCourses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [err, setErr] = useState("");
@@ -364,12 +428,8 @@ function SubjectsPage({ session }) {
         const list = await fetchCourses(5000);
         setCourses(list);
 
-        const subs = uniqBy(
-          list
-            .map((c) => (c.subject || c.category || "General").toString().trim())
-            .filter(Boolean),
-          (s) => s.toLowerCase()
-        ).sort((a, b) => a.localeCompare(b));
+        const subs = uniqBy(list.map((c) => subjectOf(c)), (s) => s.toLowerCase())
+          .sort((a, b) => a.localeCompare(b));
 
         setSubjects(subs);
       } catch (e) {
@@ -387,43 +447,22 @@ function SubjectsPage({ session }) {
 
       {err && <div className="notice error">{err}</div>}
 
-      <div className="tableCard">
-        <div className="tableWrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Courses</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {subjects.map((s) => {
-                const count = courses.filter(
-                  (c) => (c.subject || c.category || "General").toString().trim() === s
-                ).length;
-
-                return (
-                  <tr key={s}>
-                    <td className="tdStrong">{s}</td>
-                    <td className="muted">{count}</td>
-                    <td className="tdRight">
-                      <Link className="linkBtn" to={`/subjects/${encodeURIComponent(s)}`}>Open →</Link>
-                    </td>
-                  </tr>
-                );
-              })}
-              {subjects.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="muted">No subjects found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="subjectGrid">
+        {subjects.map((s) => {
+          const icon = SUBJECT_ICONS[s] || SUBJECT_ICONS.General;
+          const count = courses.filter((c) => subjectOf(c) === s).length;
+          return (
+            <Link key={s} to={`/subjects/${encodeURIComponent(s)}`} className="subjectCard">
+              <div className="subjectIcon">{icon}</div>
+              <div className="subjectInfo">
+                <div className="subjectTitle">{s}</div>
+                <div className="muted">{count} courses</div>
+              </div>
+              <div className="subjectArrow">→</div>
+            </Link>
+          );
+        })}
       </div>
-
-      {!session && <div className="notice">Sign in to see paid courses in the Portal.</div>}
     </section>
   );
 }
@@ -445,12 +484,9 @@ function SubjectCourses({ session }) {
       try {
         setErr("");
         const list = await fetchCourses(5000);
-        const filtered = list.filter(
-          (c) => (c.subject || c.category || "General").toString().trim() === subj
-        );
-        setCourses(filtered);
+        setCourses(list.filter((c) => subjectOf(c) === subj));
       } catch (e) {
-        setErr(e.message || "Failed to load subject courses");
+        setErr(e.message || "Failed to load courses");
       }
     })();
   }, [subj]);
@@ -459,9 +495,7 @@ function SubjectCourses({ session }) {
     const s = q.trim().toLowerCase();
     if (!s) return courses;
     return courses.filter(
-      (c) =>
-        (c.title || "").toLowerCase().includes(s) ||
-        (c.description || "").toLowerCase().includes(s)
+      (c) => (c.title || "").toLowerCase().includes(s) || (c.description || "").toLowerCase().includes(s)
     );
   }, [q, courses]);
 
@@ -474,51 +508,33 @@ function SubjectCourses({ session }) {
 
       {err && <div className="notice error">{err}</div>}
 
-      <div className="tableCard">
-        <div className="tableWrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Course</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => {
-                const e = enrollMap.get(c.id);
-                const paid = e?.is_paid === true || e?.payment_status === "paid";
-                const status = paid ? "PAID" : e ? "ENROLLED" : "LOCKED";
-
-                return (
-                  <tr key={c.id}>
-                    <td>
-                      <div className="tdStrong">{c.title}</div>
-                      <div className="muted">{c.description}</div>
-                    </td>
-                    <td>
-                      <span className={`status ${paid ? "ok" : e ? "warn" : "bad"}`}>{status}</span>
-                    </td>
-                    <td className="tdRight">
-                      <Link className="linkBtn" to={`/courses/${c.id}`}>Open →</Link>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="muted">No courses found for this subject.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="courseGrid">
+        {filtered.map((c) => {
+          const e = enrollMap.get(c.id);
+          const paid = e?.is_paid === true || e?.payment_status === "paid";
+          return (
+            <Link key={c.id} to={`/courses/${c.id}`} className="courseCard">
+              <div className="thumbLg" style={thumbStyle(c.id || c.title)} />
+              <div className="courseCardBody">
+                <div className="courseCardTitle">{c.title}</div>
+                <div className="muted">{c.description}</div>
+                <div className="courseCardMeta">
+                  <span className={`status ${paid ? "ok" : e ? "warn" : "bad"}`}>
+                    {paid ? "PAID" : e ? "ENROLLED" : "LOCKED"}
+                  </span>
+                  <span className="pill">{subjectOf(c)}</span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+        {filtered.length === 0 && <div className="notice">No courses found.</div>}
       </div>
     </section>
   );
 }
 
-/* -------------------- Courses page -------------------- */
+/* -------------------- Courses Page -------------------- */
 
 function CoursesPage({ session }) {
   const { enrollMap } = useEnrollments(session);
@@ -531,8 +547,7 @@ function CoursesPage({ session }) {
     (async () => {
       try {
         setErr("");
-        const list = await fetchCourses(5000);
-        setCourses(list);
+        setCourses(await fetchCourses(5000));
       } catch (e) {
         setErr(e.message || "Failed to load courses");
       }
@@ -542,12 +557,10 @@ function CoursesPage({ session }) {
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return courses;
-    return courses.filter(
-      (c) =>
-        (c.title || "").toLowerCase().includes(s) ||
-        (c.description || "").toLowerCase().includes(s) ||
-        (c.subject || c.category || "").toString().toLowerCase().includes(s)
-    );
+    return courses.filter((c) => {
+      const text = `${c.title} ${c.description} ${subjectOf(c)}`.toLowerCase();
+      return text.includes(s);
+    });
   }, [q, courses]);
 
   return (
@@ -559,53 +572,32 @@ function CoursesPage({ session }) {
 
       {err && <div className="notice error">{err}</div>}
 
-      <div className="tableCard">
-        <div className="tableWrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Course</th>
-                <th>Subject</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => {
-                const e = enrollMap.get(c.id);
-                const paid = e?.is_paid === true || e?.payment_status === "paid";
-                const status = paid ? "PAID" : e ? "ENROLLED" : "LOCKED";
-
-                return (
-                  <tr key={c.id}>
-                    <td>
-                      <div className="tdStrong">{c.title}</div>
-                      <div className="muted">{c.description}</div>
-                    </td>
-                    <td className="muted">{(c.subject || c.category || "General").toString()}</td>
-                    <td>
-                      <span className={`status ${paid ? "ok" : e ? "warn" : "bad"}`}>{status}</span>
-                    </td>
-                    <td className="tdRight">
-                      <Link className="linkBtn" to={`/courses/${c.id}`}>Open →</Link>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="muted">No courses found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="courseGrid">
+        {filtered.map((c) => {
+          const e = enrollMap.get(c.id);
+          const paid = e?.is_paid === true || e?.payment_status === "paid";
+          return (
+            <Link key={c.id} to={`/courses/${c.id}`} className="courseCard">
+              <div className="thumbLg" style={thumbStyle(c.id || c.title)} />
+              <div className="courseCardBody">
+                <div className="courseCardTitle">{c.title}</div>
+                <div className="muted">{c.description}</div>
+                <div className="courseCardMeta">
+                  <span className={`status ${paid ? "ok" : e ? "warn" : "bad"}`}>
+                    {paid ? "PAID" : e ? "ENROLLED" : "LOCKED"}
+                  </span>
+                  <span className="pill">{subjectOf(c)}</span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-/* -------------------- Course detail + Lessons -------------------- */
+/* -------------------- Course Detail + Lessons + Payment -------------------- */
 
 function CourseDetail({ session }) {
   const { id } = useParams();
@@ -632,7 +624,6 @@ function CourseDetail({ session }) {
     })();
   }, [id]);
 
-  // Load lessons (will return empty if RLS blocks)
   useEffect(() => {
     (async () => {
       setErr("");
@@ -641,9 +632,8 @@ function CourseDetail({ session }) {
         .select("id,title,lesson_number,created_at")
         .eq("course_id", id)
         .order("lesson_number", { ascending: true })
-        .limit(200);
+        .limit(250);
 
-      // If blocked by RLS, Supabase often returns empty (not error).
       if (error) setErr(error.message);
       setLessons(data || []);
     })();
@@ -659,7 +649,6 @@ function CourseDetail({ session }) {
     setErr("");
 
     try {
-      // Refresh token before Edge call (prevents expired JWT)
       const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
       if (refreshErr) throw refreshErr;
 
@@ -691,16 +680,24 @@ function CourseDetail({ session }) {
   return (
     <section className="coursePage">
       <div className="courseHeader">
-        <div>
-          <h2>{course?.title || "Course"}</h2>
-          <p className="muted">{course?.description || ""}</p>
+        <div className="rowCourse">
+          <div className="thumbLg" style={thumbStyle(course?.id || course?.title)} />
+          <div>
+            <h2 style={{ margin: 0 }}>{course?.title || "Course"}</h2>
+            <p className="muted" style={{ marginTop: 6 }}>{course?.description || ""}</p>
 
-          {query.get("paid") === "1" && (
-            <div className="notice">Payment success. If lessons don’t unlock immediately, refresh.</div>
-          )}
-          {query.get("canceled") === "1" && (
-            <div className="notice">Payment canceled.</div>
-          )}
+            <div className="portalMeta" style={{ marginTop: 10 }}>
+              <span className="pill">{subjectOf(course)}</span>
+              {isPaid ? <span className="pill ok">Paid</span> : <span className="pill warn">Locked</span>}
+            </div>
+
+            {query.get("paid") === "1" && (
+              <div className="notice">Payment success. If lessons don’t unlock immediately, refresh.</div>
+            )}
+            {query.get("canceled") === "1" && (
+              <div className="notice">Payment canceled.</div>
+            )}
+          </div>
         </div>
 
         <div className="courseActions">
@@ -724,8 +721,8 @@ function CourseDetail({ session }) {
         <div className="helpPanel">
           <div className="helpTitle">Student Help</div>
           <ul>
-            <li>After paying, return to this course page and refresh.</li>
-            <li>If lessons remain locked, sign out/in then refresh the course.</li>
+            <li>After paying, return here and refresh.</li>
+            <li>If lessons remain locked, sign out/in then refresh.</li>
             <li>Lessons are protected by database security.</li>
           </ul>
         </div>
@@ -734,19 +731,13 @@ function CourseDetail({ session }) {
       <div className="tableCard">
         <div className="tableTitleRow">
           <h2>Lessons</h2>
-          <div className="muted">
-            {isPaid ? "Unlocked" : "Locked until you enroll & pay"}
-          </div>
+          <div className="muted">{isPaid ? "Unlocked" : "Locked until you enroll & pay"}</div>
         </div>
 
         {!isPaid && (
           <div className="notice">
             Lessons are locked until you enroll & pay (enforced by database policies).
           </div>
-        )}
-
-        {isPaid && lessons.length === 0 && (
-          <div className="notice">No lessons found for this course.</div>
         )}
 
         <div className="tableWrap">
