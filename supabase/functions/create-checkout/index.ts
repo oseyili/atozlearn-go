@@ -7,7 +7,8 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SITE_URL = Deno.env.get("SITE_URL")!;
 
-const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-11-20" });
+// ✅ FIX: Do NOT set apiVersion (your value was rejected). Stripe SDK will use a valid default.
+const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,34 +39,26 @@ Deno.serve(async (req) => {
       "";
 
     const jwt = extractJwt(authHeader);
-    if (!jwt) {
-      return json({ error: "Missing JWT (Authorization: Bearer ...)" }, 401);
-    }
+    if (!jwt) return json({ error: "Missing JWT (Authorization: Bearer ...)" }, 401);
 
-    const { course_id } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const course_id = body?.course_id;
     if (!course_id) return json({ error: "Missing course_id" }, 400);
 
-    // ✅ Validate user with explicit JWT (no Bearer prefix)
+    // Validate user with explicit JWT
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { data: userData, error: userErr } = await userClient.auth.getUser(jwt);
-
     if (userErr || !userData?.user) {
-      return json(
-        {
-          error: "Invalid JWT",
-          details: userErr?.message ?? "No user returned",
-          debug: { token_length: jwt.length },
-        },
-        401,
-      );
+      return json({ error: "Invalid JWT", details: userErr?.message }, 401);
     }
 
     const user_id = userData.user.id;
     const email = userData.user.email ?? undefined;
 
-    // ✅ Admin client for DB writes
+    // Admin client for DB writes
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Ensure enrollment exists (unpaid until webhook marks paid)
     const { error: upsertErr } = await admin.from("enrollments").upsert({
       user_id,
       course_id,
