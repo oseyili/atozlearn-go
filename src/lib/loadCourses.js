@@ -1,25 +1,7 @@
 import { supabase } from "../supabaseClient";
 
-/**
- * Loads courses for the Master Portal from the NEW portal schema:
- * - portal_courses
- * - portal_subjects
- * - portal_course_subjects
- *
- * Returns:
- * {
- *   courses: [{ id, title, description, subject, ... }],
- *   subjects: [{ id, name, course_count }]
- * }
- */
-export async function loadCourses({
-  subjectId = null,
-  search = "",
-  limit = 200,
-} = {}) {
-  // 1) Subjects sidebar with counts
-  // We do this with an RPC-like approach via SQL? Not available here, so we aggregate client-side.
-  // Fetch subjects
+export async function loadCourses({ subjectId = null, search = "", limit = 200 } = {}) {
+  // Subjects list
   const { data: subjects, error: subjectsError } = await supabase
     .from("portal_subjects")
     .select("id,name")
@@ -30,7 +12,7 @@ export async function loadCourses({
     return { courses: [], subjects: [], error: subjectsError.message };
   }
 
-  // Fetch mappings for counts (just ids)
+  // Subject counts (NOTE: 105,800 mappings is big; this is OK short-term but we can optimize next)
   const { data: mappings, error: mappingsError } = await supabase
     .from("portal_course_subjects")
     .select("subject_id,course_id");
@@ -51,80 +33,68 @@ export async function loadCourses({
     course_count: counts.get(s.id) || 0,
   }));
 
-  // 2) Courses query
-  // We load courses and include the subject name via joins:
-  // portal_courses -> portal_course_subjects (primary) -> portal_subjects
-  let coursesQuery = supabase
+  // Courses (LEFT join so we never drop courses)
+  let q = supabase
     .from("portal_courses")
     .select(
       `
-        id,
-        title,
-        description,
-        provider,
-        external_id,
-        source_url,
-        language,
-        level,
-        duration_hours,
-        image_url,
-        is_paid,
-        currency,
-        list_price,
-        is_published,
-        created_at,
-        updated_at,
-        portal_course_subjects!inner (
-          is_primary,
-          subject_id,
-          portal_subjects (
-            id,
-            name
-          )
+      id,
+      title,
+      description,
+      provider,
+      external_id,
+      source_url,
+      language,
+      level,
+      duration_hours,
+      image_url,
+      is_paid,
+      currency,
+      list_price,
+      is_published,
+      created_at,
+      updated_at,
+      portal_course_subjects (
+        is_primary,
+        subject_id,
+        portal_subjects (
+          id,
+          name
         )
-      `
+      )
+    `
     )
     .eq("is_published", true)
     .order("updated_at", { ascending: false })
     .limit(limit);
 
-  // If filtering by subject, filter through mapping table
+  // Filter by subject using the mapping table field (works with LEFT join too)
   if (subjectId) {
-    coursesQuery = coursesQuery.eq("portal_course_subjects.subject_id", subjectId);
-  } else {
-    // Only want the primary subject row if no filter
-    coursesQuery = coursesQuery.eq("portal_course_subjects.is_primary", true);
+    q = q.eq("portal_course_subjects.subject_id", subjectId);
   }
 
-  // Simple search on title (fast + good enough)
-  // If you later want full-text search, we can switch to .textSearch on search_tsv
-  if (search && search.trim().length > 0) {
-    coursesQuery = coursesQuery.ilike("title", `%${search.trim()}%`);
+  if (search && search.trim()) {
+    q = q.ilike("title", `%${search.trim()}%`);
   }
 
-  const { data: coursesRaw, error: coursesError } = await coursesQuery;
+  const { data: raw, error: coursesError } = await q;
 
   if (coursesError) {
     console.error("loadCourses coursesError:", coursesError);
     return { courses: [], subjects: subjectsWithCounts, error: coursesError.message };
   }
 
-  // 3) Normalize course shape for UI:
-  // Add a top-level `subject` field like legacy code expected.
-  const courses = (coursesRaw || []).map((c) => {
-    const mapping = Array.isArray(c.portal_course_subjects)
-      ? c.portal_course_subjects[0]
-      : null;
+  // Pick the PRIMARY subject if present; otherwise first subject; otherwise General
+  const courses = (raw || []).map((c) => {
+    const rows = Array.isArray(c.portal_course_subjects) ? c.portal_course_subjects : [];
+    const primary = rows.find((r) => r.is_primary) || rows[0];
 
     const subjectName =
-      mapping?.portal_subjects?.name ||
-      mapping?.portal_subjects?.[0]?.name ||
+      primary?.portal_subjects?.name ||
+      primary?.portal_subjects?.[0]?.name ||
       "General";
 
-    return {
-      ...c,
-      subject: subjectName,
-    };
+    return { ...c, subject: subjectName };
   });
 
   return { courses, subjects: subjectsWithCounts, error: null };
