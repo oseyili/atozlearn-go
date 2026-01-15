@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14?target=denonext";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -34,7 +34,6 @@ serve(async (req) => {
     if (!SUPABASE_ANON_KEY) return res200({ ok: false, error: "Missing SUPABASE_ANON_KEY" });
     if (!SERVICE_ROLE_KEY) return res200({ ok: false, error: "Missing SERVICE_ROLE_KEY" });
 
-    // Require user login
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.toLowerCase().startsWith("bearer ")) {
       return res200({ ok: false, error: "Missing Authorization Bearer token" });
@@ -46,17 +45,10 @@ serve(async (req) => {
 
     const userRes = await supabaseUser.auth.getUser();
     const user = userRes.data?.user;
-    if (!user || userRes.error) {
-      return res200({ ok: false, error: "Not authenticated" });
-    }
+    if (!user || userRes.error) return res200({ ok: false, error: "Not authenticated" });
 
-    // Parse body: expects { session_id, course_id }
     let body: any = {};
-    try {
-      body = await req.json();
-    } catch (_) {
-      body = {};
-    }
+    try { body = await req.json(); } catch (_) { body = {}; }
 
     const session_id = safeString(body.session_id);
     const course_id = safeString(body.course_id);
@@ -64,20 +56,13 @@ serve(async (req) => {
     if (!session_id) return res200({ ok: false, error: "Missing session_id" });
     if (!course_id) return res200({ ok: false, error: "Missing course_id" });
 
-    // Verify with Stripe
     const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
     const session = await stripe.checkout.sessions.retrieve(session_id);
 
-    // Must be paid
     if (session.payment_status !== "paid") {
-      return res200({
-        ok: false,
-        error: "Payment not confirmed as paid",
-        payment_status: session.payment_status,
-      });
+      return res200({ ok: false, error: "Payment not confirmed as paid", payment_status: session.payment_status });
     }
 
-    // Extra safety: ensure course_id matches what we set at checkout (metadata)
     const metaCourse = session.metadata?.course_id;
     const metaUser = session.metadata?.user_id;
 
@@ -88,8 +73,8 @@ serve(async (req) => {
       return res200({ ok: false, error: "User mismatch", metaUser, user_id: user.id });
     }
 
-    // Upsert entitlement using service role (bypasses RLS)
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
     const { error } = await supabaseAdmin
       .from("course_entitlements")
       .upsert(
@@ -97,9 +82,7 @@ serve(async (req) => {
         { onConflict: "user_id,course_id" },
       );
 
-    if (error) {
-      return res200({ ok: false, error: "Failed to unlock entitlement", details: error });
-    }
+    if (error) return res200({ ok: false, error: "Failed to unlock entitlement", details: error });
 
     return res200({ ok: true, unlocked: { user_id: user.id, course_id } });
   } catch (e) {
