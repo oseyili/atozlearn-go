@@ -25,3 +25,8 @@ dist-ssr
 
 ops/.secrets.env
 
+
+# local helper scripts
+fix-all.ps1
+install-autopilot.ps1
+
