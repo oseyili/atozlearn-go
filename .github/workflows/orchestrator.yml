@@ -1,0 +1,58 @@
+﻿name: Orchestrator (Auto-check + Auto-repair)
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: orchestrator-main
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run probes (healthcheck)
+        id: probe
+        continue-on-error: true
+        env:
+          PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
+          HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+        run: node .github/scripts/orchestrate.mjs
+
+      - name: Auto-repair (deterministic patches + PR best-effort)
+        if: ${{ steps.probe.outcome != 'success' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/scripts/repair.mjs
+
+      - name: Trigger Deploy after repair (best-effort)
+        if: ${{ steps.probe.outcome != 'success' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run deploy.yml --ref main || true
+
+      - name: Re-run probes (post-repair)
+        if: ${{ steps.probe.outcome != 'success' }}
+        continue-on-error: true
+        env:
+          PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
+          HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+        run: node .github/scripts/orchestrate.mjs
