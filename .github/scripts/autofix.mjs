@@ -45,9 +45,6 @@ function note(changed, label) {
   }
 }
 
-/**
- * Patch 1: Ensure canonical src/supabaseClient.js exists
- */
 const supabaseClientJs = `import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -62,62 +59,50 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 note(changedWrite("src/supabaseClient.js", supabaseClientJs), "Ensure src/supabaseClient.js");
 
-/**
- * Patch 2: Normalize src/main.jsx import to ./supabaseClient (best-effort, idempotent)
- */
 note(
   replaceInFile("src/main.jsx", (txt) => {
-    const re = /from\s+['"](\.\/|\.\.\/|\.\/lib\/|\.\/utils\/|\.\/services\/|\.\/config\/)?supabaseClient(\.(js|jsx|ts|tsx))?['"]/g;
+    const re = /from\\s+['"](\\.\\/|\\.\\.\\/|\\.\\/lib\\/|\\.\\/utils\\/|\\.\\/services\\/|\\.\\/config\\/)?supabaseClient(\\.(js|jsx|ts|tsx))?['"]/g;
     return txt.replace(re, 'from "./supabaseClient"');
   }),
   "Normalize src/main.jsx import path (if present)"
 );
 
-/**
- * Patch 3: Best-effort patch create-checkout for:
- * - HEALTHCHECK_API_KEY bypass
- * - Authorization Bearer forwarding into Supabase createClient via global headers
- */
 const fnPath = "supabase/functions/create-checkout/index.ts";
 
 note(
   replaceInFile(fnPath, (txt) => {
     let out = txt;
 
-    // Ensure HEALTHCHECK_API_KEY env read exists
     if (!out.includes("HEALTHCHECK_API_KEY")) {
-      const envBlockRe = /(const\s+SUPABASE_ANON_KEY\s*=\s*Deno\.env\.get\([^)]*\)![^\n]*\n)/;
+      const envBlockRe = /(const\\s+SUPABASE_ANON_KEY\\s*=\\s*Deno\\.env\\.get\\([^)]*\\)![^\\n]*\\n)/;
       if (envBlockRe.test(out)) {
-        out = out.replace(envBlockRe, `$1const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;\n`);
+        out = out.replace(envBlockRe, `$1const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;\\n`);
       } else {
-        out = `const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;\n` + out;
+        out = `const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;\\n` + out;
       }
     }
 
-    // Ensure authHeader exists in handler
-    if (!out.match(/const\s+authHeader\s*=\s*req\.headers\.get\(/)) {
-      const serveRe = /Deno\.serve\s*\(\s*async\s*\(\s*req\s*\)\s*=>\s*\{\s*/;
+    if (!out.match(/const\\s+authHeader\\s*=\\s*req\\.headers\\.get\\(/)) {
+      const serveRe = /Deno\\.serve\\s*\\(\\s*async\\s*\\(\\s*req\\s*\\)\\s*=>\\s*\\{\\s*/;
       if (serveRe.test(out)) {
         out = out.replace(
           serveRe,
-          (m) => m + `const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";\n`
+          (m) => m + `const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";\\n`
         );
       }
     }
 
-    // Ensure createClient forwards Authorization
     const hasForwarded =
       out.includes("global: { headers: { Authorization: authHeader") ||
       out.includes("global:{headers:{Authorization:authHeader");
 
     if (!hasForwarded) {
       out = out.replace(
-        /createClient\(\s*SUPABASE_URL\s*,\s*SUPABASE_ANON_KEY\s*\)/g,
+        /createClient\\(\\s*SUPABASE_URL\\s*,\\s*SUPABASE_ANON_KEY\\s*\\)/g,
         'createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader } } })'
       );
     }
 
-    // Add deterministic healthcheck bypass early in handler if missing
     if (!out.includes("x-healthcheck-key") && !out.includes("healthcheck")) {
       const bypass = `
 // Deterministic healthcheck bypass (does not require JWT / Stripe)
@@ -135,13 +120,13 @@ try {
 } catch (_) {}
 `;
 
-      const insertAfterCorsRe = /(const\s+CORS\s*=\s*corsHeaders\([^)]*\)\s*;\s*\n)/;
+      const insertAfterCorsRe = /(const\\s+CORS\\s*=\\s*corsHeaders\\([^)]*\\)\\s*;\\s*\\n)/;
       if (insertAfterCorsRe.test(out)) {
-        out = out.replace(insertAfterCorsRe, `$1${bypass}\n`);
+        out = out.replace(insertAfterCorsRe, `$1${bypass}\\n`);
       } else {
-        const serveStartRe = /Deno\.serve\s*\(\s*async\s*\(\s*req\s*\)\s*=>\s*\{\s*/;
+        const serveStartRe = /Deno\\.serve\\s*\\(\\s*async\\s*\\(\\s*req\\s*\\)\\s*=>\\s*\\{\\s*/;
         if (serveStartRe.test(out)) {
-          out = out.replace(serveStartRe, (m) => m + bypass + "\n");
+          out = out.replace(serveStartRe, (m) => m + bypass + "\\n");
         }
       }
     }
