@@ -144,3 +144,4 @@ try {
   console.error("Autofix script error (ignored):", e?.message ?? e);
   process.exit(0);
 }
+
