@@ -6,7 +6,6 @@
 
 const PROD_BASE_URL = must("PROD_BASE_URL");
 const SUPABASE_FUNCTIONS_BASE = must("SUPABASE_FUNCTIONS_BASE");
-const HEALTHCHECK_API_KEY = must("HEALTHCHECK_API_KEY");
 
 async function check(name, url, opts = {}) {
   const res = await fetch(url, opts);
@@ -14,20 +13,16 @@ async function check(name, url, opts = {}) {
   if (!res.ok) {
     throw new Error(`[${name}] ${res.status} ${res.statusText}\n${text.slice(0, 600)}`);
   }
+  console.log(`OK: ${name}`);
 }
 
 (async () => {
+  // 1) Frontend alive
   await check("frontend", `${PROD_BASE_URL}/`);
-  await check("create-checkout OPTIONS", `${SUPABASE_FUNCTIONS_BASE}/create-checkout`, { method: "OPTIONS" });
 
-  await check("create-checkout health", `${SUPABASE_FUNCTIONS_BASE}/create-checkout`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-healthcheck-key": HEALTHCHECK_API_KEY,
-    },
-    body: JSON.stringify({ healthcheck: true }),
-  });
+  // 2) Health function reachable (no JWT, no Stripe)
+  await check("health OPTIONS", `${SUPABASE_FUNCTIONS_BASE}/health`, { method: "OPTIONS" });
+  await check("health GET", `${SUPABASE_FUNCTIONS_BASE}/health`, { method: "GET" });
 
   console.log("OK: healthchecks passed");
 })().catch((e) => {
