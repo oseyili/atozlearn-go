@@ -23,55 +23,23 @@ jobs:
         with:
           node-version: 20
 
-      - name: Probe (Health)
-        id: probe
-        continue-on-error: true
+      - name: Write status beacon (no secrets, just status codes)
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
           SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
-          HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
-        run: node .github/scripts/healthcheck.mjs
+        run: node .github/scripts/write-status.mjs
 
-      - name: Repair code (deterministic patches)
-        if: ${{ steps.probe.outcome != 'success' }}
+      - name: Commit beacon to repo (best-effort)
         continue-on-error: true
-        run: node .github/scripts/autofix.mjs || true
-
-      - name: Install Supabase CLI
-        if: ${{ steps.probe.outcome != 'success' }}
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Link Supabase project
-        if: ${{ steps.probe.outcome != 'success' }}
-        continue-on-error: true
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
-
-      - name: Sync critical secrets into Supabase
-        if: ${{ steps.probe.outcome != 'success' }}
-        continue-on-error: true
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase secrets set HEALTHCHECK_API_KEY="${{ secrets.HEALTHCHECK_API_KEY }}" || true
-          supabase secrets set STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" || true
-          supabase secrets set STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ops/last-orchestrator-check.json
+          git commit -m "chore: update orchestrator status beacon" || true
+          git push origin main || true
 
-      - name: Deploy critical functions (force)
-        if: ${{ steps.probe.outcome != 'success' }}
-        continue-on-error: true
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          supabase functions deploy health || true
-          supabase functions deploy create-checkout || true
-          supabase functions deploy stripe-webhook || true
-
-      - name: Re-probe (Health after repair+deploy)
-        if: ${{ steps.probe.outcome != 'success' }}
+      - name: Probe (Health) - fail allowed
+        id: probe
         continue-on-error: true
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
