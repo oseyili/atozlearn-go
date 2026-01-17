@@ -1,0 +1,27 @@
+﻿name: Production Health Check
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: health-main
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run health checks
+        env:
+          PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
+          HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+        run: node .github/scripts/healthcheck.mjs
