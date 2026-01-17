@@ -17,6 +17,7 @@ export async function enrollAndPay(courseId) {
       method: "POST",
       headers: {
       Authorization: Bearer ${session?.access_token || ''},
+      Authorization: Bearer ${session?.access_token || ''},
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
@@ -41,5 +42,6 @@ export async function enrollAndPay(courseId) {
     alert("Unexpected error starting payment. Check console.");
   }
 }
+
 
 
