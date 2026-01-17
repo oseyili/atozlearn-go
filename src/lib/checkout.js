@@ -19,11 +19,7 @@ export async function enrollAndPay(courseId) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        course_id: courseId,
-        success_url: `${window.location.origin}/payment-success`,
-        cancel_url: `${window.location.origin}/payment-cancel`,
-      }),
+      body: JSON.stringify({ course_id, successUrl: `${window.location.origin}/success?session_id={CHECKOUT_SESSION_ID}`, cancelUrl: `${window.location.origin}/cancel` }),
     });
 
     const json = await res.json();
@@ -44,3 +40,4 @@ export async function enrollAndPay(courseId) {
     alert("Unexpected error starting payment. Check console.");
   }
 }
+

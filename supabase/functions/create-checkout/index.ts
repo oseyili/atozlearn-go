@@ -1,136 +1,85 @@
-﻿import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14?target=denonext";
+﻿import Stripe from "https://esm.sh/stripe@14?target=denonext";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
+const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "";
+
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function res200(body: unknown) {
+function json(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
   });
 }
 
-function safeString(v: unknown) {
-  return typeof v === "string" ? v.trim() : "";
-}
-
-function originFrom(req: Request) {
-  const o = req.headers.get("origin") || "";
-  if (o) return o.replace(/\/$/, "");
-  const r = req.headers.get("referer") || "";
-  try { if (r) return new URL(r).origin; } catch (_) {}
-  return "";
-}
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return res200({ ok: false, error: "Method not allowed" });
-
+Deno.serve(async (req) => {
   try {
-    const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-    if (!STRIPE_SECRET_KEY) return res200({ ok: false, error: "Missing STRIPE_SECRET_KEY" });
-    if (!SUPABASE_URL) return res200({ ok: false, error: "Missing SUPABASE_URL" });
-    if (!SUPABASE_ANON_KEY) return res200({ ok: false, error: "Missing SUPABASE_ANON_KEY" });
+    const auth = req.headers.get("authorization") ?? "";
 
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.toLowerCase().startsWith("bearer ")) {
-      return res200({ ok: false, error: "Missing Authorization Bearer token" });
+    if (!STRIPE_SECRET_KEY) return json({ error: "Missing STRIPE_SECRET_KEY env var" }, 500);
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      return json({ error: "Missing SUPABASE_URL or SUPABASE_ANON_KEY env var" }, 500);
+    }
+
+    const body = await req.json().catch(() => ({}));
+
+    const courseId = body?.course_id;
+    if (!courseId) return json({ error: "Missing course_id" }, 400);
+
+    const successUrl =
+      body?.successUrl ??
+      (SITE_URL ? `${SITE_URL}/success?session_id={CHECKOUT_SESSION_ID}` : null);
+    const cancelUrl = body?.cancelUrl ?? (SITE_URL ? `${SITE_URL}/cancel` : null);
+
+    if (!successUrl || !cancelUrl) {
+      return json(
+        {
+          error: "Missing successUrl/cancelUrl (and SITE_URL is not set)",
+          hint: "Send { successUrl, cancelUrl } in request body, or set SITE_URL in Supabase secrets.",
+        },
+        400,
+      );
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: auth ? { Authorization: auth } : {} },
     });
 
-    const userRes = await supabase.auth.getUser();
-    const user = userRes.data?.user;
-    if (!user || userRes.error) return res200({ ok: false, error: "Not authenticated" });
+    const { data: course, error: courseErr } = await supabase
+      .from("courses")
+      .select("stripe_price_id")
+      .eq("id", courseId)
+      .single();
 
-    let body: any = {};
-    try { body = await req.json(); } catch (_) { body = {}; }
+    if (courseErr) return json({ error: "Course lookup failed", details: courseErr.message }, 500);
 
-    const course_id = safeString(body.course_id);
-
-    // Optional: still accept an explicit price_id if you ever need it
-    const price_id = safeString(body.price_id);
-
-    if (!course_id) return res200({ ok: false, error: "Missing course_id" });
-
-    const base = originFrom(req);
-    const success_url = safeString(body.success_url) || (base ? `${base}/payment-success` : "");
-    const cancel_url = safeString(body.cancel_url) || (base ? `${base}/payment-cancel` : "");
-
-    if (!success_url || !cancel_url) {
-      return res200({ ok: false, error: "Missing success_url/cancel_url and could not infer origin" });
-    }
-
-    // Load course record (includes permanent Stripe price mapping)
-    const anon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data: courseRow, error: courseErr } = await anon
-      .from("portal_courses")
-      .select("title,currency,list_price,stripe_price_id")
-      .eq("id", course_id)
-      .maybeSingle();
-
-    if (courseErr) {
-      return res200({ ok: false, error: "Failed to load course", details: courseErr });
-    }
+    const priceId = course?.stripe_price_id;
+    if (!priceId) return json({ error: "Course has no stripe_price_id" }, 400);
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
 
-    // Pricing priority:
-    // 1) explicit price_id from client (rare)
-    // 2) courseRow.stripe_price_id (PERMANENT mapping)
-    // 3) fallback computed from list_price (works even without Stripe product)
-    let line_items: Stripe.Checkout.SessionCreateParams.LineItem[];
-
-    const mappedPriceId = safeString(courseRow?.stripe_price_id);
-
-    if (price_id) {
-      line_items = [{ price: price_id, quantity: 1 }];
-    } else if (mappedPriceId) {
-      line_items = [{ price: mappedPriceId, quantity: 1 }];
-    } else {
-      const title = courseRow?.title || "Course Enrollment";
-      const currency = (courseRow?.currency || "GBP").toString().toLowerCase();
-      const lp = Number(courseRow?.list_price);
-      const unit_amount = Number.isFinite(lp) && lp > 0 ? Math.round(lp * 100) : 1000; // £10 fallback
-
-      line_items = [{
-        price_data: { currency, product_data: { name: title }, unit_amount },
-        quantity: 1,
-      }];
-    }
-
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items,
-      success_url,
-      cancel_url,
-      metadata: {
-        user_id: user.id,
-        course_id,
-      },
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: { course_id: String(courseId) },
     });
 
-    console.log("Checkout session created", {
-      session_id: session.id,
-      user_id: user.id,
-      course_id,
-      used_mapped_price: !!mappedPriceId && !price_id,
-      used_explicit_price: !!price_id,
-    });
+    if (!session.url) return json({ error: "Stripe session created but no url returned" }, 500);
 
-    return res200({ ok: true, url: session.url });
+    return json({ url: session.url }, 200);
   } catch (e) {
-    console.error("create-checkout error:", e?.stack || e?.message || e);
-    return res200({ ok: false, error: "create-checkout failed", details: e?.message || String(e) });
+    return json({ error: String(e?.message ?? e) }, 500);
   }
 });
