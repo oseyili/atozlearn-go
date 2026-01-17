@@ -8,7 +8,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write
 
 concurrency:
   group: orchestrator-main
@@ -24,35 +23,58 @@ jobs:
         with:
           node-version: 20
 
-      - name: Run probes (healthcheck)
+      - name: Probe (Health)
         id: probe
         continue-on-error: true
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
           SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
           HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
-        run: node .github/scripts/orchestrate.mjs
+        run: node .github/scripts/healthcheck.mjs
 
-      - name: Auto-repair (deterministic patches + PR best-effort)
+      - name: Repair code (deterministic patches)
+        if: ${{ steps.probe.outcome != 'success' }}
+        continue-on-error: true
+        run: node .github/scripts/autofix.mjs || true
+
+      - name: Install Supabase CLI
+        if: ${{ steps.probe.outcome != 'success' }}
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
         if: ${{ steps.probe.outcome != 'success' }}
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node .github/scripts/repair.mjs
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
 
-      - name: Trigger Deploy after repair (best-effort)
+      - name: Sync critical secrets into Supabase
         if: ${{ steps.probe.outcome != 'success' }}
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          gh workflow run deploy.yml --ref main || true
+          supabase secrets set HEALTHCHECK_API_KEY="${{ secrets.HEALTHCHECK_API_KEY }}" || true
+          supabase secrets set STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" || true
+          supabase secrets set STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" || true
 
-      - name: Re-run probes (post-repair)
+      - name: Deploy critical functions (force)
+        if: ${{ steps.probe.outcome != 'success' }}
+        continue-on-error: true
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy health || true
+          supabase functions deploy create-checkout || true
+          supabase functions deploy stripe-webhook || true
+
+      - name: Re-probe (Health after repair+deploy)
         if: ${{ steps.probe.outcome != 'success' }}
         continue-on-error: true
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
           SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
           HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
-        run: node .github/scripts/orchestrate.mjs
+        run: node .github/scripts/healthcheck.mjs
