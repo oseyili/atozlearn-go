@@ -1,3 +1,4 @@
+const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;
 ﻿// supabase/functions/create-checkout/index.ts
 import Stripe from "https://esm.sh/stripe@14?target=denonext";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -22,7 +23,22 @@ function json(body: unknown, status = 200, extraHeaders: Record<string, string> 
 }
 
 Deno.serve(async (req) => {
-  try {
+  
+// Deterministic healthcheck bypass (does not require JWT / Stripe)
+try {
+  const hcKey = req.headers.get("x-healthcheck-key") || "";
+  if (HEALTHCHECK_API_KEY && hcKey === HEALTHCHECK_API_KEY) {
+    const body = await req.json().catch(() => ({}));
+    if (body?.healthcheck === true) {
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+  }
+} catch (_) {}
+
+try {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
