@@ -1,0 +1,34 @@
+{
+  "ts": "2026-01-17T23:46:28.690Z",
+  "secretsPresent": {
+    "PROD_BASE_URL": true,
+    "SUPABASE_FUNCTIONS_BASE": true
+  },
+  "urls": {
+    "frontend": "https://atozlearn-go.onrender.com/",
+    "health": "https://aueekqupqooeauvmeszh.supabase.co/functions/v1/health"
+  },
+  "results": {
+    "frontend": {
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
+      "contentType": "text/html; charset=utf-8",
+      "bodyPreview": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <me"
+    },
+    "health_OPTIONS": {
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
+      "contentType": "text/plain;charset=UTF-8",
+      "bodyPreview": "ok"
+    },
+    "health_GET": {
+      "ok": false,
+      "status": 401,
+      "statusText": "Unauthorized",
+      "contentType": "application/json",
+      "bodyPreview": "{\"code\":401,\"message\":\"Missing authorization header\"}"
+    }
+  }
+}
