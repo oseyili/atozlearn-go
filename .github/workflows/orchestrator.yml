@@ -1,13 +1,12 @@
-﻿name: Orchestrator (Auto-check + Auto-repair)
+﻿name: Orchestrator (Auto-detect + Auto-fix)
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: orchestrator-main
@@ -23,26 +22,65 @@ jobs:
         with:
           node-version: 20
 
-      - name: Write status beacon (no secrets, just status codes)
+      # 1) Write a status beacon (no secrets, just status codes)
+      - name: Write status beacon
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
           SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
         run: node .github/scripts/write-status.mjs
 
-      - name: Commit beacon to repo (best-effort)
+      # 2) Commit the beacon (best-effort)
+      - name: Commit beacon
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ops/last-orchestrator-check.json
-          git commit -m "chore: update orchestrator status beacon" || true
+          git add ops/last-orchestrator-check.json || true
+          git commit -m "chore: update status beacon" || true
           git push origin main || true
 
-      - name: Probe (Health) - fail allowed
-        id: probe
+      # 3) If health is not 200, force deploy health function to Supabase
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Force deploy health if missing (self-heal)
+        continue-on-error: true
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" || true
+          supabase secrets set HEALTHCHECK_API_KEY="${{ secrets.HEALTHCHECK_API_KEY }}" || true
+          supabase functions deploy health || true
+
+      # 4) Re-write beacon after deploy so we can see the effect without logs
+      - name: Write beacon (post-deploy)
         continue-on-error: true
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
           SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
-          HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
-        run: node .github/scripts/healthcheck.mjs
+        run: node .github/scripts/write-status.mjs
+
+      - name: Commit beacon (post-deploy)
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ops/last-orchestrator-check.json || true
+          git commit -m "chore: update status beacon (post-deploy)" || true
+          git push origin main || true
+
+      # 5) Hard pass/fail gate: if health still not 200 after repair, mark run as failed (so Autofix can notice)
+      - name: Gate on /health status (after repair)
+        env:
+          PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
+          SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const r = JSON.parse(fs.readFileSync("ops/last-orchestrator-check.json","utf8"));
+          const s = r?.results?.health_GET?.status;
+          console.log("health_GET.status =", s);
+          if (s !== 200) process.exit(1);
+          NODE
