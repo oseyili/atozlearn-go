@@ -1,5 +1,5 @@
 {
-  "ts": "2026-01-18T09:24:36.877Z",
+  "ts": "2026-01-18T09:25:01.484Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -27,18 +27,18 @@
       "bodyPreview": "ok"
     },
     "health_GET": {
-      "ok": true,
-      "status": 200,
-      "statusText": "OK",
+      "ok": false,
+      "status": 401,
+      "statusText": "Unauthorized",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-01-18T09:24:37.616Z\"}"
+      "bodyPreview": "{\"code\":401,\"message\":\"Missing authorization header\"}"
     },
     "checkout_bypass": {
       "ok": false,
-      "status": 400,
-      "statusText": "Bad Request",
+      "status": 401,
+      "statusText": "Unauthorized",
       "contentType": "application/json",
-      "bodyPreview": "{\"error\":\"Missing required fields\",\"required\":[\"priceId\",\"successUrl\",\"cancelUrl\"],\"marker\":\"create-checkout-v2\"}"
+      "bodyPreview": "{\"error\":\"Missing Authorization Bearer token\"}"
     },
     "stripe_account": {
       "ok": true,
