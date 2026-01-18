@@ -1,32 +1,61 @@
-# Logs
-logs
+# =========================
+# Node / Vite
+# =========================
+node_modules/
+dist/
+.vite/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# =========================
+# Environment files (NEVER COMMIT)
+# =========================
+.env
+.env.*
+!.env.example
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Backups
+*.bak
+*.backup
+*.broken.*
+*.tmp
+*.swp
+*.swo
+
+# =========================
+# Supabase local artifacts
+# =========================
+.supabase/
+supabase/.temp/
+supabase/.env*
+supabase/*.bak
+supabase/*.broken.*
+
+# =========================
+# Ops / local debug artifacts
+# =========================
+ops/*.json
+ops/*.log
+ops/*.txt
+
+# Allow ONLY committed ops templates if you create them
+!ops/*.example.json
+
+# =========================
+# OS / Editor
+# =========================
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+.vscode/
+.idea/
 
-ops/.secrets.env
-
-
-# local helper scripts
-fix-all.ps1
-install-autopilot.ps1
-
+# =========================
+# Secrets / keys
+# =========================
+*.pem
+*.key
+*.p12
+*.crt
