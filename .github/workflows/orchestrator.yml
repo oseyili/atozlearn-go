@@ -22,65 +22,103 @@ jobs:
         with:
           node-version: 20
 
-      # 1) Write a status beacon (no secrets, just status codes)
-      - name: Write status beacon
+      - name: Probe (pre)
+        id: probe_pre
+        continue-on-error: true
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
           SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
-        run: node .github/scripts/write-status.mjs
+          HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: node .github/scripts/probe.mjs
 
-      # 2) Commit the beacon (best-effort)
-      - name: Commit beacon
+      - name: Commit beacon (pre)
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add ops/last-orchestrator-check.json || true
-          git commit -m "chore: update status beacon" || true
+          git commit -m "chore: orchestrator beacon (pre)" || true
           git push origin main || true
 
-      # 3) If health is not 200, force deploy health function to Supabase
+      - name: Repair (deterministic)
+        if: ${{ steps.probe_pre.outcome != 'success' }}
+        continue-on-error: true
+        run: node .github/scripts/repair.mjs || true
+
       - name: Install Supabase CLI
+        if: ${{ steps.probe_pre.outcome != 'success' }}
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Force deploy health if missing (self-heal)
+      - name: Link Supabase project
+        if: ${{ steps.probe_pre.outcome != 'success' }}
+        continue-on-error: true
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Sync critical secrets into Supabase
+        if: ${{ steps.probe_pre.outcome != 'success' }}
         continue-on-error: true
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" || true
           supabase secrets set HEALTHCHECK_API_KEY="${{ secrets.HEALTHCHECK_API_KEY }}" || true
-          supabase functions deploy health || true
+          supabase secrets set STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" || true
+          supabase secrets set STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" || true
 
-      # 4) Re-write beacon after deploy so we can see the effect without logs
-      - name: Write beacon (post-deploy)
+      - name: Deploy critical functions
+        if: ${{ steps.probe_pre.outcome != 'success' }}
+        continue-on-error: true
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy health || true
+          supabase functions deploy create-checkout || true
+          supabase functions deploy stripe-webhook || true
+
+      - name: Probe (post)
+        if: ${{ steps.probe_pre.outcome != 'success' }}
+        id: probe_post
         continue-on-error: true
         env:
           PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
           SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
-        run: node .github/scripts/write-status.mjs
+          HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        run: node .github/scripts/probe.mjs
 
-      - name: Commit beacon (post-deploy)
+      - name: Commit beacon (post)
+        if: ${{ steps.probe_pre.outcome != 'success' }}
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add ops/last-orchestrator-check.json || true
-          git commit -m "chore: update status beacon (post-deploy)" || true
+          git commit -m "chore: orchestrator beacon (post)" || true
           git push origin main || true
 
-      # 5) Hard pass/fail gate: if health still not 200 after repair, mark run as failed (so Autofix can notice)
-      - name: Gate on /health status (after repair)
-        env:
-          PROD_BASE_URL: ${{ secrets.PROD_BASE_URL }}
-          SUPABASE_FUNCTIONS_BASE: ${{ secrets.SUPABASE_FUNCTIONS_BASE }}
+      - name: Gate (global standards)
+        if: ${{ steps.probe_pre.outcome != 'success' }}
         run: |
           node - <<'NODE'
           const fs = require("fs");
           const r = JSON.parse(fs.readFileSync("ops/last-orchestrator-check.json","utf8"));
-          const s = r?.results?.health_GET?.status;
-          console.log("health_GET.status =", s);
-          if (s !== 200) process.exit(1);
+          const frontend = r?.results?.frontend?.status;
+          const health = r?.results?.health_GET?.status;
+          const checkout = r?.results?.checkout_bypass?.status;
+          const stripe = r?.results?.stripe_account?.status;
+          const stripeSkipped = r?.results?.stripe_account?.skipped === true;
+
+          console.log("frontend:", frontend, "health:", health, "checkout_bypass:", checkout, "stripe:", stripeSkipped ? "skipped" : stripe);
+
+          const okFrontend = frontend === 200;
+          const okHealth = health === 200;
+          const okCheckout = (checkout === 200) || (checkout === undefined); // if bypass not configured, don't hard fail checkout probe
+          const okStripe = stripeSkipped ? true : (stripe === 200);
+
+          if (okFrontend && okHealth && okCheckout && okStripe) process.exit(0);
+          process.exit(1);
           NODE
