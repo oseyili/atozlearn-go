@@ -1,5 +1,5 @@
 {
-  "ts": "2026-01-18T10:27:54.065Z",
+  "ts": "2026-01-18T10:46:40.216Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -35,10 +35,10 @@
     },
     "checkout_bypass": {
       "ok": false,
-      "status": 401,
-      "statusText": "Unauthorized",
+      "status": 400,
+      "statusText": "Bad Request",
       "contentType": "application/json",
-      "bodyPreview": "{\"error\":\"Missing Authorization Bearer token\"}"
+      "bodyPreview": "{\"marker\":\"create-checkout-v6\",\"error\":\"Missing required fields\",\"required\":[\"userId\",\"courseId\"]}"
     },
     "stripe_account": {
       "ok": true,
