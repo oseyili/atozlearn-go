@@ -1,7 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
-// ✅ Adjust if your Supabase client file path is different
 import { supabase } from "../supabaseClient";
 
 export default function PortalPage() {
@@ -11,6 +9,7 @@ export default function PortalPage() {
   const [busy, setBusy] = useState(false);
 
   const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [subjects, setSubjects] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -29,8 +28,13 @@ export default function PortalPage() {
     return data?.user ?? null;
   }
 
+  async function loadIsAdmin() {
+    const { data, error } = await supabase.rpc("is_admin");
+    if (error) return false;
+    return !!data;
+  }
+
   async function loadSubjects() {
-    // If your subjects table/columns differ, this will still fail gracefully.
     const { data, error } = await supabase
       .from("subjects")
       .select("id,name")
@@ -41,8 +45,6 @@ export default function PortalPage() {
   }
 
   async function loadCourses() {
-    // Keep this light to avoid slow portal loads.
-    // If your schema differs, adjust columns here only.
     const { data, error } = await supabase
       .from("courses")
       .select("id,title,subject,created_at")
@@ -54,7 +56,6 @@ export default function PortalPage() {
   }
 
   async function loadPaidCourses() {
-    // Uses the RPC you already created earlier
     const { data, error } = await supabase.rpc("get_paid_courses");
     if (error) return [];
     return data ?? [];
@@ -67,6 +68,9 @@ export default function PortalPage() {
       const u = await loadUser();
       setUser(u);
 
+      const admin = u ? await loadIsAdmin() : false;
+      setIsAdmin(admin);
+
       const [s, c] = await Promise.all([loadSubjects(), loadCourses()]);
       setSubjects(s);
       setCourses(c);
@@ -78,8 +82,7 @@ export default function PortalPage() {
         setPaidCourses([]);
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+      setError(e?.message || String(e));
     } finally {
       setLoading(false);
     }
@@ -95,10 +98,7 @@ export default function PortalPage() {
     }
   }
 
-  useEffect(() => {
-    refreshAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { refreshAll(); }, []);
 
   return (
     <div style={{ padding: 16, fontFamily: "system-ui, sans-serif", maxWidth: 1100, margin: "0 auto" }}>
@@ -107,6 +107,12 @@ export default function PortalPage() {
           <h1 style={{ margin: 0 }}>Master Portal</h1>
           <div style={{ opacity: 0.75, marginTop: 4 }}>Learn anything, from A to Z</div>
           <div style={{ opacity: 0.75, marginTop: 6 }}>{signedInLabel}</div>
+
+          {isAdmin ? (
+            <div style={{ marginTop: 8 }}>
+              <Link to="/admin/payments">Admin â€¢ Payments Audit</Link>
+            </div>
+          ) : null}
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -144,24 +150,6 @@ export default function PortalPage() {
       </div>
 
       <div style={{ marginTop: 18 }}>
-        <h2 style={{ marginBottom: 8 }}>Subjects</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10 }}>
-          {subjects.map((s) => (
-            <div
-              key={s.id}
-              style={{ padding: 12, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 10 }}
-            >
-              <b>{s.name}</b>
-              <div style={{ opacity: 0.7, marginTop: 6, fontSize: 13 }}>ID: {s.id}</div>
-            </div>
-          ))}
-          {subjects.length === 0 && (
-            <div style={{ opacity: 0.7 }}>No subjects found.</div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 18 }}>
         <h2 style={{ marginBottom: 8 }}>Paid Courses</h2>
         {!user ? (
           <div style={{ opacity: 0.7 }}>Sign in to see your paid courses.</div>
@@ -185,10 +173,7 @@ export default function PortalPage() {
                     <td style={{ padding: 10, fontWeight: 700 }}>{p.course_title ?? p.course_id}</td>
                     <td style={{ padding: 10 }}>PAID</td>
                     <td style={{ padding: 10 }}>
-                      <button
-                        onClick={() => nav(`/course/${p.course_id}`)}
-                        style={{ padding: "8px 10px" }}
-                      >
+                      <button onClick={() => nav(`/course/${p.course_id}`)} style={{ padding: "8px 10px" }}>
                         Open
                       </button>
                     </td>
@@ -217,10 +202,7 @@ export default function PortalPage() {
                   <td style={{ padding: 10, fontWeight: 700 }}>{c.title ?? "Course"}</td>
                   <td style={{ padding: 10, opacity: 0.75 }}>{c.id}</td>
                   <td style={{ padding: 10 }}>
-                    <button
-                      onClick={() => nav(`/course/${c.id}`)}
-                      style={{ padding: "8px 10px" }}
-                    >
+                    <button onClick={() => nav(`/course/${c.id}`)} style={{ padding: "8px 10px" }}>
                       Open
                     </button>
                   </td>
@@ -239,7 +221,7 @@ export default function PortalPage() {
       </div>
 
       <div style={{ marginTop: 18, opacity: 0.6, fontSize: 12 }}>
-        © {new Date().getFullYear()} AtoZlearn-go • Secure payments • Progress tracking • Support
+        Â© {new Date().getFullYear()} AtoZlearn-go â€¢ Secure payments â€¢ Progress tracking â€¢ Support
       </div>
     </div>
   );
