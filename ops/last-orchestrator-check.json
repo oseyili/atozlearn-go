@@ -1,5 +1,5 @@
 {
-  "ts": "2026-01-18T09:25:01.484Z",
+  "ts": "2026-01-18T09:43:43.853Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -35,10 +35,10 @@
     },
     "checkout_bypass": {
       "ok": false,
-      "status": 401,
-      "statusText": "Unauthorized",
+      "status": 500,
+      "statusText": "Internal Server Error",
       "contentType": "application/json",
-      "bodyPreview": "{\"error\":\"Missing Authorization Bearer token\"}"
+      "bodyPreview": "{\"marker\":\"create-checkout-v4\",\"error\":\"Stripe error\",\"message\":\"The Checkout Session's total amount due must add up to at least £0.30 gbp\"}"
     },
     "stripe_account": {
       "ok": true,
