@@ -1,52 +1,27 @@
-function MasterPortal() {
-  const [courses, setCourses] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+import React from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setErr("");
-      try {
-        const list = await loadAllCourses();
-        setCourses(list);
+import PortalPage from "./pages/PortalPage.jsx";
+import CoursePage from "./pages/CoursePage.jsx";
 
-        const subs = [...new Set(
-          list.map(c => c.subject || c.category || "General")
-        )].sort();
-
-        setSubjects(subs);
-      } catch (e) {
-        setErr(e.message);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  if (loading) return <div className="notice">Loading 7000+ courses…</div>;
-  if (err) return <div className="notice error">{err}</div>;
-
+export default function App() {
   return (
-    <section>
-      <h1 className="portalTitle">AtoZlearn Master Portal</h1>
+    <Routes>
+      {/* Default entry */}
+      <Route path="/" element={<Navigate to="/portal" replace />} />
 
-      <div className="stats">
-        <span>{courses.length} Courses</span>
-        <span>{subjects.length} Subjects</span>
-      </div>
+      {/* Main portal */}
+      <Route path="/portal" element={<PortalPage />} />
 
-      <div className="subjectGrid">
-        {subjects.map(s => (
-          <Link key={s} to={`/subjects/${encodeURIComponent(s)}`} className="subjectCard">
-            <h3>{s}</h3>
-            <p>{courses.filter(c =>
-              (c.subject || c.category || "General") === s
-            ).length} courses</p>
-          </Link>
-        ))}
-      </div>
-    </section>
+      {/* Course page: unlock + content linked via RPCs */}
+      <Route path="/course/:courseId" element={<CoursePage />} />
+
+      {/* Optional success/cancel routes after Stripe */}
+      <Route path="/success" element={<Navigate to="/portal" replace />} />
+      <Route path="/cancel" element={<Navigate to="/portal" replace />} />
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/portal" replace />} />
+    </Routes>
   );
 }

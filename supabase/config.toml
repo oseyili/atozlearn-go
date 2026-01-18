@@ -1,13 +1,70 @@
+# =========================================================
+# Supabase Configuration
+# Project: AtoZlearn-go
+# =========================================================
+
 project_id = "aueekqupqooeauvmeszh"
 
-[functions.create-checkout]
+# ---------------------------------------------------------
+# API
+# ---------------------------------------------------------
+[api]
 enabled = true
-verify_jwt = false
-import_map = "./functions/create-checkout/deno.json"
-entrypoint = "./functions/create-checkout/index.ts"
+port = 54321
+schemas = ["public", "auth", "storage"]
+extra_search_path = ["public"]
+max_rows = 1000
 
-[functions.stripe-webhook]
+# ---------------------------------------------------------
+# Database
+# ---------------------------------------------------------
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+# ---------------------------------------------------------
+# Studio
+# ---------------------------------------------------------
+[studio]
 enabled = true
+port = 54323
+
+# ---------------------------------------------------------
+# Email testing (disabled)
+# ---------------------------------------------------------
+[inbucket]
+enabled = false
+
+# =========================================================
+# EDGE FUNCTIONS — SECURITY MODEL
+# =========================================================
+
+# ---------------------------------------------------------
+# AUTHENTICATED USER FUNCTIONS
+# ---------------------------------------------------------
+
+# Create Stripe Checkout Session
+# Requires logged-in user
+[functions.create-checkout]
+verify_jwt = true
+
+# Cancel a user's subscription (period-end cancel)
+[functions.cancel-subscription]
+verify_jwt = true
+
+# Restore purchases from Stripe
+[functions.restore-purchases]
+verify_jwt = true
+
+# ---------------------------------------------------------
+# PUBLIC / SERVER-ONLY FUNCTIONS
+# ---------------------------------------------------------
+
+# Stripe Webhook (Stripe cannot send JWT)
+[functions.stripe-webhook]
 verify_jwt = false
-import_map = "./functions/stripe-webhook/deno.json"
-entrypoint = "./functions/stripe-webhook/index.ts"
+
+# Health check / diagnostics
+[functions.health]
+verify_jwt = false
