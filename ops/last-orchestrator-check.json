@@ -1,5 +1,5 @@
 {
-  "ts": "2026-01-18T11:51:10.272Z",
+  "ts": "2026-01-19T11:24:29.721Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -27,18 +27,18 @@
       "bodyPreview": "ok"
     },
     "health_GET": {
-      "ok": false,
-      "status": 401,
-      "statusText": "Unauthorized",
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":401,\"message\":\"Missing authorization header\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-01-19T11:24:30.525Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
       "status": 401,
       "statusText": "Unauthorized",
       "contentType": "application/json",
-      "bodyPreview": "{\"error\":\"Missing Authorization Bearer token\"}"
+      "bodyPreview": "{\"code\":401,\"message\":\"Missing authorization header\"}"
     },
     "stripe_account": {
       "ok": true,
