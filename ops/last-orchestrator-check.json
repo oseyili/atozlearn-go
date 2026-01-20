@@ -1,5 +1,5 @@
 {
-  "ts": "2026-01-20T01:58:33.097Z",
+  "ts": "2026-01-20T01:58:54.739Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -31,14 +31,14 @@
       "status": 200,
       "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-01-20T01:58:33.759Z\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-01-20T01:58:55.661Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
-      "status": 400,
-      "statusText": "Bad Request",
+      "status": 401,
+      "statusText": "Unauthorized",
       "contentType": "application/json",
-      "bodyPreview": "{\"marker\":\"create-checkout-v7\",\"error\":\"Missing required fields\",\"required\":[\"courseId\"]}"
+      "bodyPreview": "{\"code\":401,\"message\":\"Missing authorization header\"}"
     },
     "stripe_account": {
       "ok": true,
