@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+ï»¿import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 
@@ -6,6 +6,8 @@ export default function PortalPage() {
   const nav = useNavigate();
 
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -13,66 +15,128 @@ export default function PortalPage() {
   const [courses, setCourses] = useState([]);
   const [paidCourses, setPaidCourses] = useState([]);
 
-  const [tab, setTab] = useState("paid");
-const [activeSubject, setActiveSubject] = useState(null);
-  const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
 
-  const paidIds = useMemo(() => new Set(paidCourses.map(p => p.course_id)), [paidCourses]);
+  const [courseQuery, setCourseQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("paid"); // paid | courses | subjects
 
-const stats = useMemo(() => ({
-    subjects: subjects.length,
-    courses: courses.length,
-    paid: paidCourses.length
-  }), [subjects, courses, paidCourses]);
+  const signedInLabel = useMemo(() => {
+    if (!user?.email) return "Not signed in";
+    return `Signed in: ${user.email}`;
+  }, [user]);
 
   const filteredCourses = useMemo(() => {
-  let list = courses;
-  if (activeSubject) list = list.filter(c => c.subject === activeSubject);
-  if (!query) return list;
-  const q = query.toLowerCase();
-  return list.filter(c =>
-    (c.title || "").toLowerCase().includes(q) ||
-    (c.id || "").toLowerCase().includes(q)
+    const q = courseQuery.trim().toLowerCase();
+    if (!q) return courses;
+    return courses.filter((c) => {
+      const title = (c.title ?? "").toLowerCase();
+      const id = (c.id ?? "").toLowerCase();
+      return title.includes(q) || id.includes(q);
+    });
+  }, [courses, courseQuery]);
+
+  const stats = useMemo(
+    () => ({
+      courses: courses.length,
+      subjects: subjects.length,
+      paidCourses: paidCourses.length,
+    }),
+    [courses.length, subjects.length, paidCourses.length]
   );
-}, [query, courses, activeSubject]);
 
-  const [progress, setProgress] = useState({});
+  async function loadUser() {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return null;
+    return data?.user ?? null;
+  }
 
-useEffect(() => {
-    (async () => {
-      setLoading(true);
+  async function loadIsAdmin() {
+    const { data, error } = await supabase.rpc("is_admin");
+    if (error) return false;
+    return !!data;
+  }
 
-      const { data: u } = await supabase.auth.getUser();
-      setUser(u?.user ?? null);
+  async function loadSubjects() {
+    const { data, error } = await supabase
+      .from("subjects")
+      .select("id,name")
+      .order("name", { ascending: true });
+    if (error) return [];
+    return data ?? [];
+  }
 
-      if (u?.user) {
-        const { data: admin } = await supabase.rpc("is_admin");
-        setIsAdmin(!!admin);
+  async function loadCourses() {
+    const { data, error } = await supabase
+      .from("courses")
+      .select("id,title,subject,created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) return [];
+    return data ?? [];
+  }
+
+  async function loadPaidCourses() {
+    const { data, error } = await supabase.rpc("get_paid_courses");
+    if (error) return [];
+    return data ?? [];
+  }
+
+  async function refreshAll() {
+    setLoading(true);
+    setError("");
+    try {
+      const u = await loadUser();
+      setUser(u);
+
+      const admin = u ? await loadIsAdmin() : false;
+      setIsAdmin(admin);
+
+      const [s, c] = await Promise.all([loadSubjects(), loadCourses()]);
+      setSubjects(s);
+      setCourses(c);
+
+      if (u) {
+        const pc = await loadPaidCourses();
+        setPaidCourses(pc);
+      } else {
+        setPaidCourses([]);
       }
-
-      const [{ data: s }, { data: c }, { data: p }] = await Promise.all([
-        supabase.from("subjects").select("id,name").order("name"),
-        supabase.from("courses").select("id,title,created_at").limit(200),
-        supabase.rpc("get_paid_courses")
-      ]);
-
-      setSubjects(s || []);
-      setCourses(c || []);
-      setPaidCourses(p || []);
-if (u?.user) {
-  const { data: prog } = await supabase
-    .from("course_progress")
-    .select("course_id,progress");
-  setProgress(Object.fromEntries((prog||[]).map(r=>[r.course_id,r.progress])));
-}
+    } catch (e) {
+      setError(e?.message || String(e));
+    } finally {
       setLoading(false);
-    })();
+    }
+  }
+
+  async function signOut() {
+    setBusy(true);
+    try {
+      await supabase.auth.signOut();
+      await refreshAll();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const TabButton = ({ id, label, count }) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`tabBtn ${activeTab === id ? "tabBtnActive" : ""}`}
+      type="button"
+    >
+      <span>{label}</span>
+      <span className="pill">{count}</span>
+    </button>
+  );
 
   return (
     <div className="page">
-      {/* TOP BAR */}
-      <header className="topbar">
+      <div className="topbar">
         <div className="brand">
           <div className="logo">A</div>
           <div>
@@ -82,156 +146,231 @@ if (u?.user) {
         </div>
 
         <div className="actions">
+          <div className="statusText">{signedInLabel}</div>
+
+          <button className="btn" onClick={refreshAll} disabled={loading || busy} type="button">
+            Reload
+          </button>
+
           {user ? (
-            <>
-              <span className="status">Signed in</span>
-              <button className="btn ghost" onClick={() => supabase.auth.signOut()}>
-                Sign out
-              </button>
-            </>
+            <button className="btn btnGhost" onClick={signOut} disabled={loading || busy} type="button">
+              Sign out
+            </button>
           ) : (
-            <Link to="/login" className="btn ghost">Sign in</Link>
-          )}
-        </div>
-      </header>
-
-      {/* HERO */}
-      <section className="hero">
-        <div>
-          <h1>Master Portal</h1>
-          <p>Browse subjects, unlock courses, and continue learning.</p>
-
-          {isAdmin && (
-  <div className="adminPanel">
-    <b>Admin Overview</b>
-    <div>Total Courses: {courses.length}</div>
-    <div>Paid Enrollments: {paidCourses.length}</div>
-  </div>
-)
-            <Link to="/admin/payments" className="admin">
-              Admin • Payments Audit
+            <Link className="btn btnGhost" to="/login">
+              Sign in
             </Link>
           )}
         </div>
+      </div>
+
+      {error ? (
+        <div className="alert">
+          <b>Error:</b> {error}
+        </div>
+      ) : null}
+
+      <div className="hero">
+        <div>
+          <h1 className="h1">Master Portal</h1>
+          <div className="muted">Subjects + courses load from your database. Paid courses unlock lessons.</div>
+
+          {isAdmin ? (
+            <div style={{ marginTop: 10 }}>
+              <Link to="/admin/payments" className="adminLink">
+                Admin â€¢ Payments Audit
+              </Link>
+            </div>
+          ) : null}
+        </div>
 
         <div className="stats">
-          <Stat label="Subjects" value={stats.subjects} />
-          <Stat label="Courses" value={stats.courses} />
-          <Stat label="Paid Courses" value={stats.paid} accent />
+          <div className="statCard">
+            <div className="statLabel">Courses</div>
+            <div className="statValue">{stats.courses}</div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Subjects</div>
+            <div className="statValue">{stats.subjects}</div>
+          </div>
+          <div className="statCard">
+            <div className="statLabel">Paid courses</div>
+            <div className="statValue">{stats.paidCourses}</div>
+          </div>
         </div>
-      </section>
+      </div>
 
-      {/* TABS */}
-      <nav className="tabs">
-        <Tab id="paid" active={tab} onClick={setTab} label="Paid Courses" />
-        <Tab id="courses" active={tab} onClick={setTab} label="Browse Courses" />
-        <Tab id="subjects" active={tab} onClick={setTab} label="Subjects" />
-      </nav>
+      <div className="tabs">
+        <TabButton id="paid" label="Paid Courses" count={paidCourses.length} />
+        <TabButton id="courses" label="Browse Courses" count={courses.length} />
+        <TabButton id="subjects" label="Subjects" count={subjects.length} />
+      </div>
 
-      {/* CONTENT */}
-      <main className="content">
-        {loading && <div className="empty">Loading…</div>}
+      {activeTab === "paid" ? (
+        <div className="section">
+          <div className="sectionHeader">
+            <div>
+              <div className="sectionTitle">Paid Courses</div>
+              <div className="mutedSmall">Shown only when signed in and marked paid in enrollments.</div>
+            </div>
+          </div>
 
-        {!loading && tab === "paid" && (
-          paidCourses.length === 0
-            ? <div className="empty">No paid courses yet.</div>
-            : <Grid items={paidCourses} onOpen={id => nav(`/course/${id}`)} />
-        )}
+          {!user ? (
+            <div className="empty">Sign in to see your paid courses.</div>
+          ) : paidCourses.length === 0 ? (
+            <div className="empty">No paid courses yet. After payment, the webhook must mark enrollments as paid.</div>
+          ) : (
+            <div className="grid">
+              {paidCourses.map((p) => (
+                <div className="card" key={p.course_id}>
+                  <div className="cardTitle">{p.course_title ?? "Course"}</div>
+                  <div className="mutedSmall">{p.course_id}</div>
 
-        {!loading && tab === "courses" && (
-          <>
-            <input
-              className="search"
-              placeholder="Search courses…"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-            />
-            <Grid items={filteredCourses} paidIds={paidIds} onOpen={id => nav(`/course/${id}`)} />
-          </>
-        )}
+                  <div className="cardRow">
+                    <span className="badge badgePaid">PAID</span>
+                    <button className="btn" onClick={() => nav(`/course/${p.course_id}`)} type="button">
+                      Open
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
-        {!loading && tab === "subjects" && (
-          <Grid items={subjects.map(s => ({ id: s.id, title: s.name }))} />
-        )}
-      </main>
+      {activeTab === "courses" ? (
+        <div className="section">
+          <div className="sectionHeader">
+            <div>
+              <div className="sectionTitle">Browse Courses</div>
+              <div className="mutedSmall">Showing latest 200 for performance. Use search.</div>
+            </div>
 
-      <footer className="footer">
-        © {new Date().getFullYear()} AtoZlearn-go · Secure · Scalable · Professional
-      </footer>
+            <div className="searchWrap">
+              <input
+                className="search"
+                value={courseQuery}
+                onChange={(e) => setCourseQuery(e.target.value)}
+                placeholder="Search by title or course id..."
+              />
+              <div className="mutedSmall" style={{ textAlign: "right" }}>
+                Showing {filteredCourses.length}/{courses.length}
+              </div>
+            </div>
+          </div>
+
+          <div className="tableWrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th style={{ width: 260 }}>Course ID</th>
+                  <th style={{ width: 120 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCourses.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <div className="tdStrong">{c.title ?? "Course"}</div>
+                      <div className="mutedSmall">{c.created_at ? new Date(c.created_at).toLocaleDateString() : "-"}</div>
+                    </td>
+                    <td className="mutedSmall">{c.id}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <button className="btn btnGhost" onClick={() => nav(`/course/${c.id}`)} type="button">
+                        Open
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredCourses.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="emptyRow">
+                      {loading ? "Loading..." : "No matching courses."}
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === "subjects" ? (
+        <div className="section">
+          <div className="sectionHeader">
+            <div>
+              <div className="sectionTitle">Subjects</div>
+              <div className="mutedSmall">Browse subjects (course filter view can be added next).</div>
+            </div>
+          </div>
+
+          {subjects.length === 0 ? (
+            <div className="empty">{loading ? "Loading..." : "No subjects found."}</div>
+          ) : (
+            <div className="grid">
+              {subjects.map((s) => (
+                <div className="card" key={s.id}>
+                  <div className="cardTitle">ðŸ“š {s.name}</div>
+                  <div className="mutedSmall">{s.id}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      <div className="footer">Â© {new Date().getFullYear()} AtoZlearn-go â€¢ Secure payments â€¢ Progress tracking â€¢ Support</div>
 
       <style>{`
-.thumb{
-  height:120px;
-  border-radius:12px;
-  background:linear-gradient(135deg,#6366f1,#22c55e);
-  margin-bottom:8px;
-}
-        .page{max-width:1100px;margin:auto;padding:16px;font-family:system-ui}
-        .topbar{display:flex;justify-content:space-between;align-items:center}
-        .brand{display:flex;gap:12px;align-items:center}
-        .logo{width:42px;height:42px;border-radius:12px;background:#2563eb;color:#fff;
-              display:grid;place-items:center;font-weight:900}
-        .hero{margin:24px 0;padding:24px;border-radius:20px;
-              background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;
-              display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
-        .stats{display:flex;gap:12px}
-        .stat{background:#fff;color:#000;padding:14px;border-radius:14px;min-width:120px}
-        .tabs{display:flex;gap:10px;margin-bottom:12px}
-        .tab{padding:10px 14px;border-radius:14px;border:1px solid #ccc;cursor:pointer}
-        .tab.active{background:#2563eb;color:#fff}
-        .content{min-height:240px}
-        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-        .card{border:1px solid #ddd;border-radius:16px;padding:14px}
-        .btn{padding:10px 14px;border-radius:12px;background:#2563eb;color:#fff;border:none}
-        .ghost{background:#fff;color:#000}
-        .search{padding:12px;border-radius:14px;border:1px solid #ccc;width:100%;margin-bottom:12px}
-        .empty{opacity:.7;padding:20px;text-align:center}
-        .footer{text-align:center;opacity:.6;margin-top:32px}
-        .admin{display:inline-block;margin-top:8px;color:#fff;text-decoration:underline}
+        .page{max-width:1100px;margin:0 auto;padding:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;}
+        .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(15,23,42,.10);border-radius:16px;background:#fff;box-shadow:0 8px 20px rgba(15,23,42,.05);}
+        .brand{display:flex;align-items:center;gap:12px}
+        .logo{width:38px;height:38px;border-radius:12px;background:rgba(2,132,199,.12);display:grid;place-items:center;font-weight:900}
+        .title{font-weight:900;font-size:14px;letter-spacing:.2px}
+        .subtitle{opacity:.7;font-size:12px;margin-top:2px}
+        .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+        .statusText{opacity:.75;font-size:12px}
+        .btn{padding:10px 12px;border-radius:12px;border:1px solid rgba(15,23,42,.14);background:#0f172a;color:#fff;font-weight:700;cursor:pointer}
+        .btn:disabled{opacity:.55;cursor:not-allowed}
+        .btnGhost{background:#fff;color:#0f172a}
+        .alert{margin-top:12px;padding:12px;border-radius:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2)}
+        .hero{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-top:14px;padding:14px;border-radius:16px;background:linear-gradient(180deg, rgba(2,132,199,.08), rgba(2,132,199,.03));border:1px solid rgba(2,132,199,.15)}
+        .h1{margin:0;font-size:22px;letter-spacing:-.2px}
+        .muted{opacity:.78;margin-top:6px}
+        .mutedSmall{opacity:.7;font-size:12px}
+        .adminLink{display:inline-block;padding:8px 10px;border:1px solid rgba(15,23,42,.14);border-radius:12px;background:#fff;text-decoration:none;color:#0f172a;font-weight:700}
+        .stats{display:flex;gap:10px;flex-wrap:wrap}
+        .statCard{min-width:140px;padding:10px 12px;border-radius:14px;background:#fff;border:1px solid rgba(15,23,42,.10)}
+        .statLabel{opacity:.7;font-size:12px}
+        .statValue{font-size:18px;font-weight:900;margin-top:2px}
+        .tabs{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+        .tabBtn{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;border:1px solid rgba(15,23,42,.14);background:#fff;font-weight:800;cursor:pointer}
+        .tabBtnActive{background:#0f172a;color:#fff}
+        .pill{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid rgba(15,23,42,.14);opacity:.9}
+        .tabBtnActive .pill{border-color:rgba(255,255,255,.35)}
+        .section{margin-top:14px;padding:14px;border:1px solid rgba(15,23,42,.10);border-radius:16px;background:#fff;box-shadow:0 8px 20px rgba(15,23,42,.04)}
+        .sectionHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+        .sectionTitle{font-weight:900;font-size:16px}
+        .empty{margin-top:10px;padding:12px;border-radius:12px;background:rgba(15,23,42,.03);border:1px dashed rgba(15,23,42,.18);opacity:.85}
+        .grid{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+        .card{padding:12px;border-radius:16px;border:1px solid rgba(15,23,42,.10);background:#fff}
+        .cardTitle{font-weight:900}
+        .cardRow{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
+        .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px solid rgba(15,23,42,.14);font-size:12px;font-weight:900}
+        .badgePaid{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.30)}
+        .searchWrap{display:flex;flex-direction:column;gap:6px;min-width:280px}
+        .search{padding:10px 12px;border-radius:14px;border:1px solid rgba(15,23,42,.14);outline:none}
+        .tableWrap{margin-top:12px;overflow:auto;border-radius:16px;border:1px solid rgba(15,23,42,.10)}
+        .table{width:100%;border-collapse:collapse}
+        .table th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;opacity:.7;background:rgba(15,23,42,.03);text-align:left;padding:10px}
+        .table td{padding:10px;border-top:1px solid rgba(15,23,42,.08);vertical-align:top}
+        .tdStrong{font-weight:900}
+        .emptyRow{padding:14px;opacity:.75;text-align:center}
+        .footer{margin-top:16px;opacity:.6;font-size:12px;text-align:center}
       `}</style>
     </div>
   );
 }
-
-function Stat({ label, value, accent }) {
-  return (
-    <div className="stat" style={accent ? { borderLeft: "6px solid #2563eb" } : {}}>
-      <div style={{ fontSize: 12, opacity: .7 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 900 }}>{value}</div>
-    </div>
-  );
-}
-
-function Tab({ id, label, active, onClick }) {
-  return (
-    <button className={`tab ${active === id ? "active" : ""}`} onClick={() => onClick(id)}>
-      {label}
-    </button>
-  );
-}
-
-function Grid({ items, onOpen, paidIds }) { {
-  return (
-    <div className="grid">
-      {items.map(i => (
-        <div key={i.id} className="card">
-  <div className="thumb"></div>
-          <div style={{ fontWeight: 800 }}>{i.title || "Item"}</div>
-          <div style={{ fontSize: 12, opacity: .6 }}>{i.id}</div>
-          {paidIds && !paidIds.has(i.id)
-  ? <div style={{opacity:.6,marginTop:10}}>?? Locked</div>
-  : onOpen && (
-            <button className="btn" style={{ marginTop: 10 }} onClick={() => onOpen(i.id)}>
-              Open
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-
-
-
-
