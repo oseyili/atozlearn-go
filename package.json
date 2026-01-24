@@ -5,7 +5,7 @@
     "type":  "module",
     "scripts":  {
                     "dev":  "vite",
-                    "build":  "vite build",
+                    "build": "vite build && node scripts/postbuild-clean.mjs",
                     "lint":  "eslint .",
                     "preview":  "vite preview",
                     "prebuild":  "node scripts/write-version.mjs \u0026\u0026 node scripts/enforce-portal.mjs",
@@ -35,3 +35,4 @@
                             "vite":  "^7.2.4"
                         }
 }
+
