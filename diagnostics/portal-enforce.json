@@ -1,0 +1,14 @@
+{
+  "mode": "HEAL",
+  "ok": true,
+  "actions": [],
+  "router": {
+    "file": "src\\App.jsx",
+    "changed": true,
+    "reason": "Patched router"
+  },
+  "files": {
+    "js": "match",
+    "css": "match"
+  }
+}

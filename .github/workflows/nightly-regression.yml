@@ -1,0 +1,54 @@
+﻿name: Nightly Regression Guard
+
+on:
+  schedule:
+    - cron: "10 2 * * *" # 02:10 UTC nightly
+  workflow_dispatch: {}
+
+jobs:
+  crawl_and_health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # Set this in GitHub repo variables or secrets:
+      # PLAYWRIGHT_BASE_URL: your deployed app base URL (Render)
+      PLAYWRIGHT_BASE_URL: ${{ vars.PLAYWRIGHT_BASE_URL }}
+
+      # Optional: Supabase URL for self-test; set as repo vars
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright nightly crawl
+        run: npm run crawl:nightly
+
+      - name: Call backend self-test (if URL set)
+        if: env.VITE_SUPABASE_URL != ''
+        run: |
+          curl -sS "$VITE_SUPABASE_URL/functions/v1/self-test" | head -c 4000
+          echo ""
+          curl -sS "$VITE_SUPABASE_URL/functions/v1/integrity-check" | head -c 4000
+          echo ""
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright/artifacts
+            playwright/report

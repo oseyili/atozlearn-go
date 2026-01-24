@@ -1,4 +1,4 @@
-﻿import { supabase } from "../supabaseClient";
+import { supabase } from "../supabaseClient";
 
 /**
  * Creates a Stripe Checkout session for a course.

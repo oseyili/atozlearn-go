@@ -1,0 +1,12 @@
+﻿services:
+  - type: web
+    name: atozlearngo
+    env: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20

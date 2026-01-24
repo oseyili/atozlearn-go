@@ -1,25 +1,28 @@
-import React from "react";
+﻿import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import App from "./App.jsx";
+import * as AppModule from "./App.jsx";
 import "./index.css";
+const ResolvedApp =
+  (AppModule && (AppModule.default || AppModule.App)) ||
+  (() => (
+    <div style={{ padding: 24, fontFamily: "system-ui" }}>
+      <b>App export missing.</b> Please ensure src/App.jsx exports default or named App.
+    </div>
+  ));
 
-// ✅ Make sure this file exists: src/supabaseClient.js (or .ts)
-import { supabase } from "./supabaseClient";
-
-// ✅ TEMP DEBUG: log session in console
-supabase.auth.getSession().then(({ data, error }) => {
-  if (error) {
-    console.error("❌ Supabase getSession() error:", error);
-    return;
-  }
-  console.log("🔐 Supabase session:", data?.session ?? null);
-});
-
+const ResolvedApp =
+  (AppModule && (AppModule.default || AppModule.App)) ||
+  (() => (
+    <div style={{ padding: 24, fontFamily: "system-ui" }}>
+      <b>App export missing.</b> Please ensure src/App.jsx exports default or named App.
+    </div>
+  ));
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
+  <BrowserRouter>
+    <ResolvedApp />
+  </BrowserRouter>
 );
+
+
+

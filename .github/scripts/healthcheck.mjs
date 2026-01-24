@@ -1,4 +1,4 @@
-﻿const must = (k) => {
+const must = (k) => {
   const v = process.env[k];
   if (!v) {
     console.error(`MISSING SECRET: ${k}`);

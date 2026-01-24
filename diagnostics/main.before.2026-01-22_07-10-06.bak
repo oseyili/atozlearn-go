@@ -1,0 +1,28 @@
+﻿import React from "react";
+import PortalPage from "./pages/PortalPage.jsx";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import App from "./App.jsx";
+import "./index.css";
+
+// âœ… Make sure this file exists: src/supabaseClient.js (or .ts)
+import { supabase } from "./supabaseClient";
+
+// âœ… TEMP DEBUG: log session in console
+supabase.auth.getSession().then(({ data, error }) => {
+  if (error) {
+    console.error("âŒ Supabase getSession() error:", error);
+    return;
+  }
+  console.log("ðŸ” Supabase session:", data?.session ?? null);
+});
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
+);
+
+

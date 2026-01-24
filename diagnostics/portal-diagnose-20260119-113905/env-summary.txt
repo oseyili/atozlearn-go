@@ -1,0 +1,3 @@
+﻿Found in local env files:
+VITE_SUPABASE_URL      = <NOT FOUND>
+VITE_SUPABASE_ANON_KEY = <NOT FOUND>

@@ -1,0 +1,5 @@
+﻿stamp=LIVE_STAMP_2026-01-23_01-13-51
+prod_base_url=https://atozlearn-go.onrender.com
+portal_url=https://atozlearn-go.onrender.com/portal
+live_has_meta=False
+live_has_stamp=False

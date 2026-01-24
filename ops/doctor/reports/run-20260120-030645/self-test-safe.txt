@@ -1,0 +1,7 @@
+﻿HTTP/1.1 200 OK
+  "ok": true,
+  "marker": "self-test-v1",
+    "ok": true,
+    "keyOk": true,
+    "priceOk": true,
+    "ok": true

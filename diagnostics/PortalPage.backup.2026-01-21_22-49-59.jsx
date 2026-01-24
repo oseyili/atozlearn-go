@@ -1,0 +1,151 @@
+import React, { useMemo } from "react";
+import version from "../version.json";
+
+/**
+ * GOLDEN MASTER PORTAL (UI template)
+ * Matches the screenshot layout/copy:
+ * - "Professional Learning Portal"
+ * - "Master Portal"
+ * - "Learn anything, from A to Z"
+ * - Quick Start panel
+ * - Subjects list
+ * - Paid Courses table
+ *
+ * This file is the source of truth; the enforcer copies it to src/pages/PortalPage.jsx.
+ */
+export default function PortalPage() {
+  // NOTE: Keep this UI deterministic. You can wire real Supabase data where indicated.
+  const userEmail = "Signed in"; // do not hardcode real email; wire auth later.
+
+  // Placeholder counts (wire to Supabase later). UI matches screenshot positions.
+  const counts = useMemo(() => ({ courses: 6998, subjects: 1 }), []);
+
+  // Placeholder subjects + paid courses (wire to Supabase later)
+  const subjects = useMemo(() => ([
+    { name: "General", courses: counts.courses }
+  ]), [counts.courses]);
+
+  const paidCourses = useMemo(() => ([
+    {
+      title: "Career Skills Course — Beginner",
+      desc: "A structured learning path with lessons, practice, and progress tracking.",
+      subject: "General",
+      status: "PAID"
+    },
+    {
+      title: "Mathematics Bootcamp — Intermediate",
+      desc: "A structured learning path with lessons, practice, and progress tracking.",
+      subject: "General",
+      status: "PAID"
+    }
+  ]), []);
+
+  return (
+    <div className="mp-root">
+      <header className="mp-topbar">
+        <div className="mp-brand">
+          <div className="mp-logo">A</div>
+          <div className="mp-brandtext">
+            <div className="mp-title">AtoZlearn-go</div>
+            <div className="mp-subtitle">Professional Learning Portal</div>
+          </div>
+        </div>
+
+        <nav className="mp-nav">
+          <a className="mp-navlink" href="/portal">Portal</a>
+          <a className="mp-navlink" href="/subjects">Subjects</a>
+          <a className="mp-navlink" href="/courses">Courses</a>
+          <button className="mp-btn mp-btn-ghost">Sign out</button>
+        </nav>
+      </header>
+
+      <main className="mp-main">
+        <section className="mp-heroRow">
+          <div className="mp-card mp-hero">
+            <div className="mp-pill">Master Portal</div>
+            <h1 className="mp-h1">Learn anything, from A to Z</h1>
+            <p className="mp-lead">
+              Subjects + courses load from your database. Paid courses unlock lessons.
+            </p>
+
+            <div className="mp-metrics">
+              <span className="mp-chip mp-chip-green">{userEmail}</span>
+              <span className="mp-chip">Courses: {counts.courses}</span>
+              <span className="mp-chip">Subjects: {counts.subjects}</span>
+            </div>
+
+            <div className="mp-actions">
+              <button className="mp-btn mp-btn-primary">Browse Subjects</button>
+              <button className="mp-btn">Browse Courses</button>
+              <button className="mp-btn">Reload</button>
+            </div>
+          </div>
+
+          <div className="mp-card mp-quick">
+            <div className="mp-quickTitle">Quick Start</div>
+            <ol className="mp-quickList">
+              <li>Open a Subject</li>
+              <li>Pick a Course</li>
+              <li>Enroll &amp; Pay</li>
+              <li>Continue lessons</li>
+            </ol>
+            <div className="mp-quickNote">Paid courses will appear below automatically.</div>
+          </div>
+        </section>
+
+        <section className="mp-section">
+          <div className="mp-sectionHead">
+            <h2 className="mp-h2">Subjects</h2>
+            <div className="mp-muted">Click a subject to view its courses</div>
+          </div>
+
+          <div className="mp-subjectGrid">
+            {subjects.map((s) => (
+              <div className="mp-card mp-subject" key={s.name}>
+                <div className="mp-subjectIcon">▦</div>
+                <div className="mp-subjectBody">
+                  <div className="mp-subjectName">{s.name}</div>
+                  <div className="mp-muted">{s.courses} courses</div>
+                </div>
+                <div className="mp-arrow">→</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="mp-section">
+          <div className="mp-sectionHead">
+            <h2 className="mp-h2">Paid Courses</h2>
+            <div className="mp-muted">Shown only when signed in and marked paid in enrollments</div>
+          </div>
+
+          <div className="mp-card mp-tableCard">
+            <div className="mp-tableHead">
+              <div>COURSE</div><div>SUBJECT</div><div>STATUS</div><div></div>
+            </div>
+
+            {paidCourses.map((c) => (
+              <div className="mp-row" key={c.title}>
+                <div className="mp-courseCell">
+                  <div className="mp-courseIcon"></div>
+                  <div>
+                    <div className="mp-courseTitle">{c.title}</div>
+                    <div className="mp-muted">{c.desc}</div>
+                  </div>
+                </div>
+                <div className="mp-muted">{c.subject}</div>
+                <div><span className="mp-badge">{c.status}</span></div>
+                <div><button className="mp-btn mp-btn-ghost">Open →</button></div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <footer className="mp-footer">
+          <span className="mp-muted">version: {version.short}</span>
+          <span className="mp-muted">built: {version.builtAt}</span>
+        </footer>
+      </main>
+    </div>
+  );
+}

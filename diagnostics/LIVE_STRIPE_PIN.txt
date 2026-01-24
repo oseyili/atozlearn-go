@@ -1,0 +1,5 @@
+﻿LIVE_STRIPE_MAPPED_COMMIT=af8630d8922ab83fc0488ad5f1388ae267379660
+BRANCH=release/live-stripe-af8630d
+TAG=LIVE_STRIPE_af8630d_2026-01-20_13-34-05
+NOTE=This branch is pinned EXACTLY to the commit that existed at the last successful Stripe payment.
+TIME_LOCAL=2026-01-20 13:34:07

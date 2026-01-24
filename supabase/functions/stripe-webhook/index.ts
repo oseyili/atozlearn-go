@@ -1,4 +1,4 @@
-﻿// FORCE-DEPLOY MARKER: stripe-webhook v5 2026-01-18
+// FORCE-DEPLOY MARKER: stripe-webhook v5 2026-01-18
 // Adds: audit logging, subscription status sync, refund handling, and enrollment updates.
 
 import Stripe from "https://esm.sh/stripe@14?target=denonext";

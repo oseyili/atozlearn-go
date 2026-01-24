@@ -1,0 +1,255 @@
+﻿C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:74       // Ensure HEALTHCHECK_API_KEY env read exists
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:75       if (!out.includes("HEALTHCHECK_API_KEY")) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:78           out = out.replace(envBlockRe, `$1const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;\n`);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:80           out = `const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;\n` + out;
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:107       // Add deterministic healthcheck bypass if missing
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:108       if (!out.includes("x-healthcheck-key") && !out.includes("healthcheck")) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:110 // Deterministic healthcheck bypass (does not require JWT / Stripe)
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:112   const hcKey = req.headers.get("x-healthcheck-key") || "";
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:113   if (HEALTHCHECK_API_KEY && hcKey === HEALTHCHECK_API_KEY) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:115     if (body?.healthcheck === true) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:138     "Patch create-checkout for JWT forwarding + healthcheck bypass (best-effort)"
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\autofix.mjs:143   // Never fail the workflow; print and exit 0
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:14   console.log("=== Healthcheck configuration ===");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:21   console.log("Health URL:", `${SUPABASE_FUNCTIONS_BASE}/health`);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:34       console.log(`RETRY ${i}/${attempts} failed for ${url}:`, e?.message ?? e);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:65   // Health function (no JWT, no Stripe)
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:66   await check("health OPTIONS", `${SUPABASE_FUNCTIONS_BASE}/health`, { method: "OPTIONS" });
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:67   await check("health GET", `${SUPABASE_FUNCTIONS_BASE}/health`, { method: "GET" });
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:69   console.log("\nOK: healthchecks passed");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:71   console.error("\nHEALTHCHECK FAILED:");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\healthcheck.mjs:71   console.error("\nHEALTHCHECK FAILED:");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\orchestrate.mjs:3 const r = spawnSync("node", [".github/scripts/healthcheck.mjs"], { stdio: "inherit" });
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:11 const HEALTHCHECK_API_KEY = must("HEALTHCHECK_API_KEY");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:63       HEALTHCHECK_API_KEY: !HEALTHCHECK_API_KEY.missing,
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:68       health: SUPABASE_FUNCTIONS_BASE.value ? `${SUPABASE_FUNCTIONS_BASE.value}/health` : null,
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:78   if (report.urls.health) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:79     report.results.health_OPTIONS = await probe(report.urls.health, "OPTIONS");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:80     report.results.health_GET = await probe(report.urls.health, "GET");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:83   // Checkout probe uses HEALTHCHECK_API_KEY bypass (no JWT, no Stripe charge)
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:84   if (report.urls.checkout && !HEALTHCHECK_API_KEY.missing) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:87       "x-healthcheck-key": HEALTHCHECK_API_KEY.value,
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:93       { healthcheck: true }
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:102   // Gate logic: define “global standards” = frontend 200, health 200, checkout bypass 200, Stripe probe 200 (if key provided)
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:105   const healthOk = must200(report.results.health_GET);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:106   const checkoutOk = report.results.checkout_bypass ? must200(report.results.checkout_bypass) : true; // if missing key, we don't fail this probe
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\probe.mjs:109   if (frontendOk && healthOk && checkoutOk && stripeOk) process.exit(0);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:29 // Ensure health function exists
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:30 if (!exists("supabase/functions/health/index.ts")) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:31   write("supabase/functions/health/index.ts", `Deno.serve(() => new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } }));\n`);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:32   note("Ensure supabase/functions/health/index.ts exists", true);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:34   note("Ensure supabase/functions/health/index.ts exists", false);
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:38 note("Ensure deploy.yml deploys health/create-checkout/stripe-webhook", replaceInFile(".github/workflows/deploy.yml", (src) => {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:41     "supabase functions deploy health",
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:58 // Harden create-checkout: no 409 + healthcheck bypass
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:64     // Make sure HEALTHCHECK_API_KEY is read
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:65     if (!out.includes("HEALTHCHECK_API_KEY")) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:68         `$1const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;\n`
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:80     // Ensure healthcheck bypass exists (header x-healthcheck-key + body.healthcheck)
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:81     if (!out.includes("x-healthcheck-key") || !out.includes("healthcheck === true")) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:83 // Deterministic healthcheck bypass (no JWT / no Stripe charge)
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:85   const hcKey = req.headers.get("x-healthcheck-key") || "";
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:86   if (HEALTHCHECK_API_KEY && hcKey === HEALTHCHECK_API_KEY) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\repair.mjs:88     if (body?.healthcheck === true) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\write-status.mjs:37       health: SUPABASE_FUNCTIONS_BASE.value ? `${SUPABASE_FUNCTIONS_BASE.value}/health` : null,
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\write-status.mjs:45   if (report.urls.health) {
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\write-status.mjs:46     report.results.health_OPTIONS = await probe(report.urls.health, "OPTIONS");
+C:\Users\oseyi\Documents\atozlearngo\.github\scripts\write-status.mjs:47     report.results.health_GET = await probe(report.urls.health, "GET");
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:1 name: Autofix Agent (Failsafe)
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:7       - "Production Health Check"
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:21     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' }}
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:31       - name: Apply deterministic patches (should never fail)
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:34       - name: Create PR / Auto-merge (best-effort, never fail)
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:62             --title "Autofix: recover build/auth/health failures" \
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:62             --title "Autofix: recover build/auth/health failures" \
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:63             --body "Autogenerated after failed Deploy/Health. Merge if checks pass." \
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\autofix.yml:63             --body "Autogenerated after failed Deploy/Health. Merge if checks pass." \
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\deploy.yml:48           supabase secrets set HEALTHCHECK_API_KEY="${{ secrets.HEALTHCHECK_API_KEY }}"
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\deploy.yml:56           supabase functions deploy health
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\health.yml:1 name: Production Health Check
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\health.yml:9   group: health-main
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\health.yml:13   health:
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\health.yml:22       - name: Run health checks
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\health.yml:26           HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\health.yml:27         run: node .github/scripts/healthcheck.mjs
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\nightly-regression.yml:1 name: Nightly Regression Guard
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\nightly-regression.yml:9   crawl_and_health:
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:31           HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:68           supabase secrets set HEALTHCHECK_API_KEY="${{ secrets.HEALTHCHECK_API_KEY }}" || true
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:78           supabase functions deploy health || true
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:89           HEALTHCHECK_API_KEY: ${{ secrets.HEALTHCHECK_API_KEY }}
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:110           const health = r?.results?.health_GET?.status;
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:115           console.log("frontend:", frontend, "health:", health, "checkout_bypass:", checkout, "stripe:", stripeSkipped ? "skipped" : stripe);
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:118           const okHealth = health === 200;
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:119           const okCheckout = (checkout === 200) || (checkout === undefined); // if bypass not configured, don't hard fail checkout probe
+C:\Users\oseyi\Documents\atozlearngo\.github\workflows\orchestrator.yml:122           if (okFrontend && okHealth && okCheckout && okStripe) process.exit(0);
+C:\Users\oseyi\Documents\atozlearngo\ops\_archived\heal.ps1:50 Write-Host "== HEAL: Sync secrets -> deploy functions -> smoke test ==" -ForegroundColor Cyan
+C:\Users\oseyi\Documents\atozlearngo\ops\_archived\heal.ps1:86 Write-Host "HEAL COMPLETE." -ForegroundColor Green
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:73   Info "Neutralizing local supabase/config.toml (prevents BOM merge failures)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:84   # 3) Verify Master Portal is the professional UI (guardrail)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:218   # 8) Install/refresh scheduled tasks: monitor + self-heal + nightly crawl
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:218   # 8) Install/refresh scheduled tasks: monitor + self-heal + nightly crawl
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:220   Info "Installing/refreshing scheduled tasks (monitor + self-heal + nightly crawl)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:220   Info "Installing/refreshing scheduled tasks (monitor + self-heal + nightly crawl)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:234   # Self-heal task (every 10 minutes)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:234   # Self-heal task (every 10 minutes)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:235   $wrapper = ".\ops\heal\run-self-heal-if-needed.ps1"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:235   $wrapper = ".\ops\heal\run-self-heal-if-needed.ps1"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:236   if (!(Test-Path $wrapper)) { throw "Missing self-heal wrapper: $wrapper (create it using previous step)" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:236   if (!(Test-Path $wrapper)) { throw "Missing self-heal wrapper: $wrapper (create it using previous step)" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:238   $taskHeal = "AtoZlearn Self-Heal Runner"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:238   $taskHeal = "AtoZlearn Self-Heal Runner"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:239   schtasks /Query /TN $taskHeal *> $null 2>&1
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:240   if ($LASTEXITCODE -eq 0) { schtasks /Delete /TN $taskHeal /F | Out-Null }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:242   schtasks /Create /TN $taskHeal /SC MINUTE /MO 10 /F /TR "`"$psExe`" -NoProfile -ExecutionPolicy Bypass -File `"$wrapAbs`"" | Out-Null
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:243   Ok "Scheduled self-heal (10 min)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:243   Ok "Scheduled self-heal (10 min)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:259   Ok "Ran monitor + self-heal check once"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:259   Ok "Ran monitor + self-heal check once"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:311   .\ops\heal,.\ops\heal\logs,`
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:372   Info "Neutralizing local supabase/config.toml (prevents BOM merge failures)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:383   # 3) Verify Master Portal is the professional UI (guardrail)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:517   # 8) Install/refresh scheduled tasks: monitor + self-heal + nightly crawl
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:517   # 8) Install/refresh scheduled tasks: monitor + self-heal + nightly crawl
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:519   Info "Installing/refreshing scheduled tasks (monitor + self-heal + nightly crawl)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:519   Info "Installing/refreshing scheduled tasks (monitor + self-heal + nightly crawl)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:533   # Self-heal task (every 10 minutes)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:533   # Self-heal task (every 10 minutes)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:534   $wrapper = ".\ops\heal\run-self-heal-if-needed.ps1"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:534   $wrapper = ".\ops\heal\run-self-heal-if-needed.ps1"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:535   if (!(Test-Path $wrapper)) { throw "Missing self-heal wrapper: $wrapper (create it using previous step)" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:535   if (!(Test-Path $wrapper)) { throw "Missing self-heal wrapper: $wrapper (create it using previous step)" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:537   $taskHeal = "AtoZlearn Self-Heal Runner"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:537   $taskHeal = "AtoZlearn Self-Heal Runner"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:538   schtasks /Query /TN $taskHeal *> $null 2>&1
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:539   if ($LASTEXITCODE -eq 0) { schtasks /Delete /TN $taskHeal /F | Out-Null }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:541   schtasks /Create /TN $taskHeal /SC MINUTE /MO 10 /F /TR "`"$psExe`" -NoProfile -ExecutionPolicy Bypass -File `"$wrapAbs`"" | Out-Null
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:542   Ok "Scheduled self-heal (10 min)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:542   Ok "Scheduled self-heal (10 min)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:558   Ok "Ran monitor + self-heal check once"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:558   Ok "Ran monitor + self-heal check once"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:679   # Even if it fails, write stamp so we don't thrash
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:1074   if (-not (Run-Retry "npm ci" { npm ci | Out-Null } 1)) { throw "npm ci failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015327.log:1075   if (-not (Run-Retry "npm run build" { npm run build | Out-Null } 1)) { throw "build failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:73   Info "Neutralizing local supabase/config.toml (prevents BOM merge failures)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:84   # 3) Verify Master Portal is the professional UI (guardrail)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:218   # 8) Install/refresh scheduled tasks: monitor + self-heal + nightly crawl
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:218   # 8) Install/refresh scheduled tasks: monitor + self-heal + nightly crawl
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:220   Info "Installing/refreshing scheduled tasks (monitor + self-heal + nightly crawl)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:220   Info "Installing/refreshing scheduled tasks (monitor + self-heal + nightly crawl)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:234   # Self-heal task (every 10 minutes)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:234   # Self-heal task (every 10 minutes)
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:235   $wrapper = ".\ops\heal\run-self-heal-if-needed.ps1"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:235   $wrapper = ".\ops\heal\run-self-heal-if-needed.ps1"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:236   if (!(Test-Path $wrapper)) { throw "Missing self-heal wrapper: $wrapper (create it using previous step)" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:236   if (!(Test-Path $wrapper)) { throw "Missing self-heal wrapper: $wrapper (create it using previous step)" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:238   $taskHeal = "AtoZlearn Self-Heal Runner"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:238   $taskHeal = "AtoZlearn Self-Heal Runner"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:239   schtasks /Query /TN $taskHeal *> $null 2>&1
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:240   if ($LASTEXITCODE -eq 0) { schtasks /Delete /TN $taskHeal /F | Out-Null }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:242   schtasks /Create /TN $taskHeal /SC MINUTE /MO 10 /F /TR "`"$psExe`" -NoProfile -ExecutionPolicy Bypass -File `"$wrapAbs`"" | Out-Null
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:243   Ok "Scheduled self-heal (10 min)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:243   Ok "Scheduled self-heal (10 min)"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:259   Ok "Ran monitor + self-heal check once"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:259   Ok "Ran monitor + self-heal check once"
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:380   # Even if it fails, write stamp so we don't thrash
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:775   if (-not (Run-Retry "npm ci" { npm ci | Out-Null } 1)) { throw "npm ci failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\activate\logs\activate-20260120-015727.log:776   if (-not (Run-Retry "npm run build" { npm run build | Out-Null } 1)) { throw "build failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:5 function Fail($msg) { Write-Host "`n[FATAL] $msg" -ForegroundColor Red; exit 1 }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:11 if (!(Test-Path $repo)) { Fail "Repo not found: $repo" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:28   if (!(Test-Path $envPath)) { Fail ".env missing at repo root" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:34   if (!$viteUrlMatch.Success) { Fail "VITE_SUPABASE_URL missing in .env" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:35   if (!$anonMatch.Success)    { Fail "VITE_SUPABASE_ANON_KEY missing in .env" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:40   if (!$viteUrl) { Fail "VITE_SUPABASE_URL empty" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:41   if (!$anon)    { Fail "VITE_SUPABASE_ANON_KEY empty" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:45   if (!$ref) { Fail "Could not parse Supabase project ref from VITE_SUPABASE_URL" }
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:51   # --- Prevent TOML BOM/config merge failures (local only) ---
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-activate.ps1:140   Fail $_.Exception.Message
+C:\Users\oseyi\Documents\atozlearngo\ops\autofix.ps1:11 function Fail($m){ Write-Host $m -ForegroundColor Red; throw $m }
+C:\Users\oseyi\Documents\atozlearngo\ops\autofix.ps1:14 if (-not (Test-Path .git)) { Fail "Not a git repo. Run from your project root." }
+C:\Users\oseyi\Documents\atozlearngo\ops\autofix.ps1:101 Write-Host "If it still fails, open Network -> create-checkout -> Response JSON and paste ONLY that JSON." -ForegroundColor Yellow
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-orchestrator.ps1:17       Warn "$name failed: $($_.Exception.Message)"
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-orchestrator.ps1:66   # --- Auto-neutralize TOML BOM/config merge failures (local only) ---
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-orchestrator.ps1:131     # If we somehow regress to auth error, hard-fail so retries trigger.
+C:\Users\oseyi\Documents\atozlearngo\ops\auto-orchestrator.ps1:187   Warn "AUTO-ORCHESTRATOR FAILED"
+C:\Users\oseyi\Documents\atozlearngo\ops\browser\nightly\crawl-nightly.js:96       failedRequests: [],
+C:\Users\oseyi\Documents\atozlearngo\ops\browser\nightly\crawl-nightly.js:103     // local listeners for request failures (keep per-page)
+C:\Users\oseyi\Documents\atozlearngo\ops\browser\nightly\crawl-nightly.js:104     const onReqFail = (req) => {
+C:\Users\oseyi\Documents\atozlearngo\ops\browser\nightly\crawl-nightly.js:105       rec.failedRequests.push({ url: req.url(), failure: req.failure() && req.failure().errorText });
+C:\Users\oseyi\Documents\atozlearngo\ops\browser\nightly\crawl-nightly.js:111     page.on("requestfailed", onReqFail);
+C:\Users\oseyi\Documents\atozlearngo\ops\browser\nightly\crawl-nightly.js:175       const allText = (html || "") + " " + rec.consoleErrors.join(" ") + " " + JSON.stringify(rec.failedRequests);
+C:\Users\oseyi\Documents\atozlearngo\ops\browser\nightly\crawl-nightly.js:199       page.off("requestfailed", onReqFail);
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\auto-code-doctor.ps1:116   if (-not (Run-Retry "npm ci" { npm ci | Out-Null } 1)) { throw "npm ci failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\auto-code-doctor.ps1:117   if (-not (Run-Retry "npm run build" { npm run build | Out-Null } 1)) { throw "build failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\auto-doctor-quick.ps1:12   # Git health + auto-rebase
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\auto-doctor-quick.ps1:28         Set-Content 'C:\Users\oseyi\Documents\atozlearngo\ops\doctor\backend-health.json'
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\loader.ps1:1 # loader.ps1 (self-healing)
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\loader.ps1:1 # loader.ps1 (self-healing)
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\ps-prompt-hook.ps1:15     # 2) If local behind remote main, self-heal rebase
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\ps-prompt-hook.ps1:15     # 2) If local behind remote main, self-heal rebase
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:19       Write-Host "[AutoDoctor] npm failed → auto-fix: npm install" -ForegroundColor Yellow
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:25         _AtoZReturnClean $r2 "[AutoDoctor] npm still failing after auto-fix (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:28       _AtoZReturnClean $ri "[AutoDoctor] npm install failed during auto-fix (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:32     _AtoZReturnClean $r "[AutoDoctor] npm failed (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:54           _AtoZReturnClean $r2 "[AutoDoctor] git push still failing after auto-fix (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:57         _AtoZReturnClean $pr "[AutoDoctor] git pull --rebase failed during auto-fix (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:61       _AtoZReturnClean $r "[AutoDoctor] git push failed (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:67     _AtoZReturnClean $r "[AutoDoctor] git failed (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:71 function global:node   { param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args) if (-not (_AtoZWrapEnabled)) { & node.exe @Args; return } $r=_AtoZRunNative "node" { node.exe @Args } 120; if($r.ok){$LASTEXITCODE=0; ($r.out|Select-Object -Last 60)} else {_AtoZReturnClean $r "[AutoDoctor] node failed (showing error):"} }
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:72 function global:python { param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args) if (-not (_AtoZWrapEnabled)) { & python.exe @Args; return } $r=_AtoZRunNative "python" { python.exe @Args } 120; if($r.ok){$LASTEXITCODE=0; ($r.out|Select-Object -Last 60)} else {_AtoZReturnClean $r "[AutoDoctor] python failed (showing error):"} }
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:73 function global:deno   { param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args) if (-not (_AtoZWrapEnabled)) { & deno.exe @Args; return } $r=_AtoZRunNative "deno" { deno.exe @Args } 120; if($r.ok){$LASTEXITCODE=0; ($r.out|Select-Object -Last 60)} else {_AtoZReturnClean $r "[AutoDoctor] deno failed (showing error):"} }
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:84     _AtoZReturnClean $r "[AutoDoctor] supabase failed (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\doctor\wrappers.ps1:94   _AtoZReturnClean $r "[AutoDoctor] curl failed (showing error):"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:1 # self-heal.ps1 (Windows PowerShell 5.1)
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:1 # self-heal.ps1 (Windows PowerShell 5.1)
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:13 $logDir = ".\ops\heal\logs"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:15 $log = Join-Path $logDir ("self-heal-" + $ts + ".log")
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:15 $log = Join-Path $logDir ("self-heal-" + $ts + ".log")
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:17 Info "Self-heal log: $log"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:17 Info "Self-heal log: $log"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:36   # Fix known local CLI TOML BOM/merge failures
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:80     git commit -m "Self-heal: redeploy + ensure helper" | Out-Null
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:80     git commit -m "Self-heal: redeploy + ensure helper" | Out-Null
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:85   Ok "SELF-HEAL COMPLETE"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:85   Ok "SELF-HEAL COMPLETE"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:88   Warn "SELF-HEAL FAILED: $($_.Exception.Message)"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:88   Warn "SELF-HEAL FAILED: $($_.Exception.Message)"
+C:\Users\oseyi\Documents\atozlearngo\ops\heal\self-heal.ps1:88   Warn "SELF-HEAL FAILED: $($_.Exception.Message)"
+C:\Users\oseyi\Documents\atozlearngo\ops\last-orchestrator-check.json:6     "HEALTHCHECK_API_KEY": true,
+C:\Users\oseyi\Documents\atozlearngo\ops\last-orchestrator-check.json:11     "health": "https://aueekqupqooeauvmeszh.supabase.co/functions/v1/health",
+C:\Users\oseyi\Documents\atozlearngo\ops\last-orchestrator-check.json:22     "health_OPTIONS": {
+C:\Users\oseyi\Documents\atozlearngo\ops\last-orchestrator-check.json:29     "health_GET": {
+C:\Users\oseyi\Documents\atozlearngo\ops\logs\auto-orchestrator-20260120-004644.log:52 [WARN] Best-effort UI wiring (import helper where checkout refs exist) failed: A parameter cannot be found that matches parameter name 'Recurse'.
+C:\Users\oseyi\Documents\atozlearngo\ops\logs\auto-orchestrator-20260120-004644.log:54 [WARN] AUTO-ORCHESTRATOR FAILED
+C:\Users\oseyi\Documents\atozlearngo\ops\monitoring\run-monitor.ps1:45     $result.self_test = @{ ok = $false; error = "self-test request failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\monitoring\run-monitor.ps1:46     $result.notes += "self-test request failed"
+C:\Users\oseyi\Documents\atozlearngo\ops\monitoring\run-monitor.ps1:56     $result.integrity = @{ ok = $false; error = "integrity-check request failed" }
+C:\Users\oseyi\Documents\atozlearngo\ops\monitoring\run-monitor.ps1:57     $result.notes += "integrity-check request failed"
+C:\Users\oseyi\Documents\atozlearngo\ops\monitoring\run-monitor.ps1:63   # Failure alerting via Windows Event Log (local alert channel)
+C:\Users\oseyi\Documents\atozlearngo\ops\monitoring\run-monitor.ps1:70       Write-EventLog -LogName Application -Source $src -EventId 1001 -EntryType Error -Message "AtoZ monitor failed. See ops\doctor\monitor-latest.json"
+C:\Users\oseyi\Documents\atozlearngo\portal-diagnose.ps1:119   Write-Host "FAILED to fetch portal HTML:"
+C:\Users\oseyi\Documents\atozlearngo\portal-diagnose.ps1:150       Write-Host "FAILED to fetch JS bundle:"
+C:\Users\oseyi\Documents\atozlearngo\portal-diagnose.ps1:213   Write-Host "Edge function probe FAILED:"
+C:\Users\oseyi\Documents\atozlearngo\src\lib\checkout.js:32         "Checkout failed:\n" +
+C:\Users\oseyi\Documents\atozlearngo\src\lib\checkout.js:41     console.error("Enroll & Pay failed:", err);
+C:\Users\oseyi\Documents\atozlearngo\src\pages\CoursePage.jsx:154       // Only fetch lessons if unlocked (even though RLS enforces it too)
+C:\Users\oseyi\Documents\atozlearngo\src\pages\CoursePage.jsx:154       // Only fetch lessons if unlocked (even though RLS enforces it too)
+C:\Users\oseyi\Documents\atozlearngo\src\pages\CoursePage.jsx:186         alert(error.message || "Checkout failed.");
+C:\Users\oseyi\Documents\atozlearngo\src\pages\CoursePage.jsx:191         alert("Checkout failed: missing Stripe URL.");
+C:\Users\oseyi\Documents\atozlearngo\src\pages\CoursePage.jsx:209         alert(error.message || "Restore failed.");
+C:\Users\oseyi\Documents\atozlearngo\src\pages\CoursePage.jsx:229         alert(error.message || "Cancel failed.");
+C:\Users\oseyi\Documents\atozlearngo\supabase\config.toml.broken.20260118-090254:9 [functions.health]
+C:\Users\oseyi\Documents\atozlearngo\supabase\config.toml.broken.20260118-090254:14 if ($cfg -notmatch '(?m)^\[functions\.health\]\s*$') {
+C:\Users\oseyi\Documents\atozlearngo\supabase\config.toml.broken.20260118-090254:18   "Applied escalation rule: verify_jwt=false for health"
+C:\Users\oseyi\Documents\atozlearngo\supabase\config.toml.broken.20260118-090254:20   $cfg2 = $cfg -replace '(?ms)^\[functions\.health\]\s*.*?(?=^\[|\z)', { param($m)
+C:\Users\oseyi\Documents\atozlearngo\supabase\config.toml.broken.20260118-090254:30     "Reinforced escalation rule: verify_jwt=false for health"
+C:\Users\oseyi\Documents\atozlearngo\supabase\config.toml.broken.20260118-090254:36 "`n--- supabase\config.toml (functions.health) ---"
+C:\Users\oseyi\Documents\atozlearngo\supabase\config.toml.broken.20260118-090254:37 Select-String -Path $cfgPath -Pattern '^\[functions\.health\]$|^verify_jwt\s*=' -Context 0,2
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\cancel-subscription\index.ts:66   if (readErr) return json({ error: "DB read failed", message: readErr.message }, 500);
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\health\index.ts:4     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-healthcheck-key",
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\integrity-check\index.ts:65     // Simple regression guard: expect “a lot” of courses if service role is set
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\sync-course-stripe\index.ts:40     if (readErr) return json({ error: "Course read failed", details: readErr.message }, 500);
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\sync-course-stripe\index.ts:67       if (upErr) return json({ error: "Failed to save stripe_product_id", details: upErr.message }, 500);
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\sync-course-stripe\index.ts:85       if (upErr2) return json({ error: "Failed to save stripe_price_id", details: upErr2.message }, 500);
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\verify-checkout\index.ts:85     if (error) return res200({ ok: false, error: "Failed to unlock entitlement", details: error });
+C:\Users\oseyi\Documents\atozlearngo\supabase\functions\verify-checkout\index.ts:90     return res200({ ok: false, error: "verify-checkout failed", details: e?.message || String(e) });

@@ -1,0 +1,7 @@
+﻿START 2026-01-20_14-59-51
+npm=C:\Program Files\nodejs\npm.cmd
+ROUTER_NOT_PATCHED
+BUILD_LOG=diagnostics\portal-build-2026-01-20_14-59-51.log
+
+FIXES_APPLIED:
+Inserted CSS import into PortalPage.jsx

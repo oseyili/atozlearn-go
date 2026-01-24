@@ -1,0 +1,51 @@
+{
+    "self_test":  {
+                      "ok":  true,
+                      "marker":  "self-test-v1",
+                      "time":  "2026-01-20T11:10:18.726Z",
+                      "env":  {
+                                  "supabaseUrlPresent":  true,
+                                  "supabaseAnonPresent":  true,
+                                  "stripeSecretPresent":  true,
+                                  "stripePricePresent":  true,
+                                  "prodBaseUrlPresent":  false,
+                                  "supabaseUrlLen":  40,
+                                  "supabaseAnonLen":  46,
+                                  "stripeSecretLen":  107,
+                                  "stripePriceLen":  30,
+                                  "prodBaseUrlLen":  0,
+                                  "stripePriceMasked":  "price_...P4yG"
+                              },
+                      "stripe":  {
+                                     "ok":  true,
+                                     "keyOk":  true,
+                                     "sampleProductId":  "prod_T...xqMw",
+                                     "priceOk":  true,
+                                     "priceId":  "price_...P4yG",
+                                     "currency":  "gbp",
+                                     "unitAmount":  35
+                                 },
+                      "supabase":  {
+                                       "ok":  true
+                                   }
+                  },
+    "integrity":  {
+                      "ok":  true,
+                      "time":  "2026-01-20T11:10:20.622Z",
+                      "checks":  {
+                                     "auth_mode":  "service_role",
+                                     "tables":  "ok",
+                                     "counts":  {
+                                                    "subjects":  1,
+                                                    "courses":  7000,
+                                                    "note":  "Authoritative (service role)."
+                                                },
+                                     "regression":  "ok"
+                                 }
+                  },
+    "notes":  [
+
+              ],
+    "time":  "2026-01-20T11:10:11.6673539+00:00",
+    "ok":  true
+}

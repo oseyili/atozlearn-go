@@ -1,0 +1,227 @@
+﻿const fs = require("fs");
+const path = require("path");
+const { chromium } = require("playwright");
+
+const APP_URL = process.env.APP_URL;
+const OUT_DIR = process.env.OUT_DIR;
+
+if (!APP_URL) throw new Error("Missing APP_URL");
+if (!OUT_DIR) throw new Error("Missing OUT_DIR");
+
+fs.mkdirSync(OUT_DIR, { recursive: true });
+
+const MAX_PAGES = Number(process.env.MAX_PAGES || 120);
+const MAX_DEPTH = Number(process.env.MAX_DEPTH || 6);
+
+function sameOrigin(url) {
+  try { return new URL(url).origin === new URL(APP_URL).origin; } catch { return false; }
+}
+function norm(url) {
+  try {
+    const u = new URL(url, APP_URL);
+    u.hash = "";
+    // tame query noise: keep only a few known params, else drop
+    const keep = new Set(["tab", "checkout"]);
+    for (const k of Array.from(u.searchParams.keys())) {
+      if (!keep.has(k)) u.searchParams.delete(k);
+    }
+    return u.toString().replace(/\/$/, "");
+  } catch { return null; }
+}
+
+(async () => {
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const runDir = path.join(OUT_DIR, `run-${ts}`);
+  fs.mkdirSync(runDir, { recursive: true });
+
+  const harPath = path.join(runDir, `nightly-${ts}.har`);
+  const summaryPath = path.join(runDir, `nightly-${ts}.summary.json`);
+  const consoleLogPath = path.join(runDir, `nightly-${ts}.console.log`);
+
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    recordHar: { path: harPath },
+  });
+  const page = await context.newPage();
+
+  const queue = [{ url: APP_URL, depth: 0 }];
+  const seen = new Set();
+  const results = [];
+
+  const global = {
+    appUrl: APP_URL,
+    started: new Date().toISOString(),
+    pagesVisited: 0,
+    checkoutAttempts: 0,
+    stripeReached: false,
+    createCheckoutStatuses: [],
+    signatures: {
+      missingAuthHeader: false,
+      missingRequiredFields: false,
+      invalidJsonBody: false,
+    },
+    har: harPath,
+    summary: summaryPath,
+    runDir,
+  };
+
+  const consoleLines = [];
+  page.on("console", (msg) => {
+    const t = msg.type();
+    if (t === "error" || t === "warning") {
+      consoleLines.push(`[${t}] ${msg.text()}`);
+    }
+  });
+  page.on("response", async (res) => {
+    const u = res.url();
+    if (u.includes("/functions/v1/create-checkout")) {
+      global.createCheckoutStatuses.push(res.status());
+    }
+  });
+
+  while (queue.length && results.length < MAX_PAGES) {
+    const { url, depth } = queue.shift();
+    const u = norm(url);
+    if (!u || seen.has(u)) continue;
+    if (!sameOrigin(u)) continue;
+    seen.add(u);
+
+    const rec = {
+      url: u,
+      depth,
+      status: null,
+      finalUrl: null,
+      consoleErrors: [],
+      failedRequests: [],
+      signatures: [],
+      stripeDetected: false,
+      checkoutClicked: false,
+      shots: [],
+    };
+
+    // local listeners for request failures (keep per-page)
+    const onReqFail = (req) => {
+      rec.failedRequests.push({ url: req.url(), failure: req.failure() && req.failure().errorText });
+    };
+    const onConsole = (msg) => {
+      if (msg.type() === "error") rec.consoleErrors.push(msg.text());
+    };
+
+    page.on("requestfailed", onReqFail);
+    page.on("console", onConsole);
+
+    try {
+      const resp = await page.goto(u, { waitUntil: "domcontentloaded", timeout: 60000 });
+      rec.status = resp ? resp.status() : null;
+      await page.waitForTimeout(800);
+      rec.finalUrl = page.url();
+
+      const shot = path.join(runDir, `page-${results.length+1}.png`);
+      await page.screenshot({ path: shot, fullPage: true });
+      rec.shots.push(shot);
+
+      // discover links
+      if (depth < MAX_DEPTH) {
+        const hrefs = await page.$$eval("a[href]", as => as.map(a => a.getAttribute("href")).filter(Boolean));
+        for (const h of hrefs) {
+          const nu = norm(h);
+          if (!nu) continue;
+          if (!sameOrigin(nu)) continue;
+          if (nu.toLowerCase().includes("logout")) continue;
+          queue.push({ url: nu, depth: depth + 1 });
+        }
+      }
+
+      // attempt checkout click
+      const candidates = [
+        'text=/checkout/i',
+        'text=/buy/i',
+        'text=/purchase/i',
+        'text=/pay/i',
+        'text=/enroll/i',
+        '[data-testid*=checkout]',
+        'a[href*="checkout"]',
+        'button:has-text("Checkout")',
+        'button:has-text("Buy")',
+        'button:has-text("Pay")',
+        'button:has-text("Enroll")',
+      ];
+
+      let clicked = false;
+      for (const sel of candidates) {
+        const loc = page.locator(sel).first();
+        const count = await loc.count().catch(() => 0);
+        if (count > 0) {
+          try {
+            global.checkoutAttempts += 1;
+            await loc.scrollIntoViewIfNeeded().catch(()=>{});
+            await loc.click({ timeout: 4000 });
+            clicked = true;
+            break;
+          } catch {}
+        }
+      }
+      rec.checkoutClicked = clicked;
+
+      await page.waitForTimeout(2000);
+      rec.finalUrl = page.url();
+      if (rec.finalUrl.includes("checkout.stripe.com")) {
+        rec.stripeDetected = true;
+        global.stripeReached = true;
+      }
+
+      const html = await page.content().catch(()=> "");
+      const allText = (html || "") + " " + rec.consoleErrors.join(" ") + " " + JSON.stringify(rec.failedRequests);
+
+      if (allText.includes("Missing authorization header")) {
+        rec.signatures.push("missingAuthHeader");
+        global.signatures.missingAuthHeader = true;
+      }
+      if (allText.includes("Missing required fields") || allText.includes('"required"')) {
+        rec.signatures.push("missingRequiredFields");
+        global.signatures.missingRequiredFields = true;
+      }
+      if (allText.includes("Invalid JSON body")) {
+        rec.signatures.push("invalidJsonBody");
+        global.signatures.invalidJsonBody = true;
+      }
+
+      if (clicked && !rec.stripeDetected) {
+        const shot2 = path.join(runDir, `after-click-${results.length+1}.png`);
+        await page.screenshot({ path: shot2, fullPage: true });
+        rec.shots.push(shot2);
+      }
+
+    } catch (e) {
+      rec.consoleErrors.push(String(e && e.message ? e.message : e));
+    } finally {
+      page.off("requestfailed", onReqFail);
+      page.off("console", onConsole);
+    }
+
+    results.push(rec);
+    global.pagesVisited = results.length;
+
+    // stop early if Stripe reached and we visited enough pages to be confident
+    if (global.stripeReached && results.length >= 15) break;
+  }
+
+  global.finished = new Date().toISOString();
+
+  fs.writeFileSync(summaryPath, JSON.stringify({ global, results }, null, 2), "utf8");
+  fs.writeFileSync(consoleLogPath, consoleLines.join("\n"), "utf8");
+
+  console.log("=== NIGHTLY CRAWL SUMMARY (SAFE) ===");
+  console.log("RunDir:", runDir);
+  console.log("Visited:", global.pagesVisited);
+  console.log("CheckoutAttempts:", global.checkoutAttempts);
+  console.log("StripeReached:", global.stripeReached);
+  console.log("create-checkout statuses:", global.createCheckoutStatuses.slice(-10));
+  console.log("Signatures:", global.signatures);
+  console.log("HAR:", global.har);
+  console.log("Summary:", global.summary);
+
+  await context.close();
+  await browser.close();
+})();

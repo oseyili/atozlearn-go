@@ -1,0 +1,689 @@
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+
+/**
+ * Professional Master Portal (AtoZlearn-go)
+ * - Premium layout + spacing + typography
+ * - Sticky topbar + subtle shadows
+ * - KPI cards + segmented tabs
+ * - Search + sortable table + empty states
+ * - Pagination (client-side demo; wire server-side later)
+ * - No external UI libs (stable for Vite builds)
+ *
+ * Wire real data later:
+ * - Replace `loadData()` to pull from Supabase (courses/subjects/enrollments)
+ * - Replace `isSignedIn` with real auth state
+ */
+
+const DEMO_ROWS = Array.from({ length: 120 }).map((_, i) => {
+  const subjects = ["Maths", "English", "Science", "History", "Geography", "ICT"];
+  const levels = ["KS1", "KS2", "KS3", "KS4"];
+  const subject = subjects[i % subjects.length];
+  const level = levels[i % levels.length];
+  const premium = i % 7 === 0;
+
+  return {
+    id: `c-${i + 1}`,
+    title: `${subject} • ${level} • Course ${i + 1}`,
+    subject,
+    level,
+    access: premium ? "Premium" : "Free",
+    updatedAt: new Date(Date.now() - i * 1000 * 60 * 60 * 12).toISOString().slice(0, 10),
+  };
+});
+
+function cx(...xs) {
+  return xs.filter(Boolean).join(" ");
+}
+
+function useDebounced(value, ms = 200) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+function Badge({ tone = "neutral", children }) {
+  const t = {
+    neutral: { bg: "rgba(15,23,42,.06)", br: "rgba(15,23,42,.14)", fg: "rgba(15,23,42,.92)" },
+    good: { bg: "rgba(16,185,129,.10)", br: "rgba(16,185,129,.22)", fg: "rgba(6,95,70,1)" },
+    pro: { bg: "rgba(99,102,241,.10)", br: "rgba(99,102,241,.22)", fg: "rgba(49,46,129,1)" },
+    warn: { bg: "rgba(245,158,11,.12)", br: "rgba(245,158,11,.24)", fg: "rgba(146,64,14,1)" },
+  }[tone];
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 10px",
+        borderRadius: 999,
+        border: `1px solid ${t.br}`,
+        background: t.bg,
+        color: t.fg,
+        fontSize: 12,
+        fontWeight: 800,
+        letterSpacing: 0.2,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function KPI({ label, value, sub }) {
+  return (
+    <div className="kpi">
+      <div className="kpiLabel">{label}</div>
+      <div className="kpiValue">{value}</div>
+      {sub ? <div className="kpiSub">{sub}</div> : null}
+    </div>
+  );
+}
+
+function Icon({ name }) {
+  const common = { width: 18, height: 18, fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" };
+  if (name === "search") {
+    return (
+      <svg {...common} viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-3.5-3.5" />
+      </svg>
+    );
+  }
+  if (name === "sort") {
+    return (
+      <svg {...common} viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 6h10" />
+        <path d="M7 12h7" />
+        <path d="M7 18h4" />
+      </svg>
+    );
+  }
+  if (name === "refresh") {
+    return (
+      <svg {...common} viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+        <path d="M21 3v6h-6" />
+      </svg>
+    );
+  }
+  if (name === "shield") {
+    return (
+      <svg {...common} viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2l8 4v6c0 5-3.4 9.4-8 10-4.6-.6-8-5-8-10V6l8-4z" />
+      </svg>
+    );
+  }
+  return null;
+}
+
+export default function PortalPage() {
+  const [isSignedIn] = useState(false);
+
+  const [tab, setTab] = useState("courses"); // courses | subjects | paid
+  const [rawQuery, setRawQuery] = useState("");
+  const query = useDebounced(rawQuery, 220);
+
+  const [sortBy, setSortBy] = useState({ key: "updatedAt", dir: "desc" }); // key, dir
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
+
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState([]);
+  const [error, setError] = useState("");
+
+  const firstLoadRef = useRef(true);
+
+  async function loadData() {
+    // Replace with your real Supabase fetch later.
+    // Keep UI stable now.
+    await new Promise((r) => setTimeout(r, firstLoadRef.current ? 350 : 200));
+    firstLoadRef.current = false;
+    return DEMO_ROWS;
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const data = await loadData();
+        if (!mounted) return;
+        setRows(data);
+      } catch (e) {
+        if (!mounted) return;
+        setError("Failed to load portal data. Please try again.");
+      } finally {
+        if (!mounted) return;
+        setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // reset pagination on tab/query change
+    setPage(1);
+  }, [tab, query, sortBy.key, sortBy.dir]);
+
+  const kpis = useMemo(() => {
+    const courses = rows.length;
+    const subjects = new Set(rows.map((r) => r.subject)).size;
+    const paidCourses = rows.filter((r) => r.access === "Premium").length;
+    return { courses, subjects, paidCourses };
+  }, [rows]);
+
+  const viewModel = useMemo(() => {
+    const q = String(query || "").toLowerCase().trim();
+
+    if (tab === "subjects") {
+      const map = new Map();
+      for (const r of rows) map.set(r.subject, (map.get(r.subject) || 0) + 1);
+      const list = Array.from(map.entries())
+        .map(([subject, count]) => ({ subject, count }))
+        .filter((x) => (q ? x.subject.toLowerCase().includes(q) : true))
+        .sort((a, b) => b.count - a.count);
+      return { kind: "subjects", list };
+    }
+
+    let filtered = rows;
+    if (tab === "paid") filtered = filtered.filter((r) => r.access === "Premium");
+    if (q) {
+      filtered = filtered.filter((r) => {
+        const hay = `${r.title} ${r.subject} ${r.level} ${r.access}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    filtered = [...filtered].sort((a, b) => {
+      const dir = sortBy.dir === "asc" ? 1 : -1;
+      const ka = a[sortBy.key] ?? "";
+      const kb = b[sortBy.key] ?? "";
+      if (ka < kb) return -1 * dir;
+      if (ka > kb) return 1 * dir;
+      return 0;
+    });
+
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const clampedPage = Math.min(page, totalPages);
+    const start = (clampedPage - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    return { kind: "courses", rows: pageRows, total, totalPages, page: clampedPage };
+  }, [rows, tab, query, sortBy, page]);
+
+  const tabDef = [
+    { key: "paid", label: "Paid Courses", count: kpis.paidCourses },
+    { key: "courses", label: "Browse Courses", count: kpis.courses },
+    { key: "subjects", label: "Subjects", count: kpis.subjects },
+  ];
+
+  function toggleSort(key) {
+    setSortBy((s) => {
+      if (s.key !== key) return { key, dir: "asc" };
+      return { key, dir: s.dir === "asc" ? "desc" : "asc" };
+    });
+  }
+
+  return (
+    <div className="shell">
+      <div className="wrap">
+        {/* Sticky Topbar */}
+        <div className="topbar">
+          <div className="brand">
+            <div className="logo" aria-hidden="true">A</div>
+            <div>
+              <div className="brandTitle">AtoZlearn-go</div>
+              <div className="brandSub">Professional Learning Portal</div>
+            </div>
+          </div>
+
+          <div className="topActions">
+            <Badge tone={isSignedIn ? "good" : "neutral"}>
+              <span className="dot" aria-hidden="true" />
+              {isSignedIn ? "Signed in" : "Not signed in"}
+            </Badge>
+
+            <button className="btnGhost" type="button" onClick={() => window.location.reload()}>
+              <Icon name="refresh" /> Reload
+            </button>
+
+            <Link className="btnPrimary" to="/signin">
+              Sign in
+            </Link>
+          </div>
+        </div>
+
+        {/* Hero */}
+        <div className="hero">
+          <div className="heroLeft">
+            <div className="heroTitle">Master Portal</div>
+            <div className="heroDesc">
+              Courses, subjects and access are driven by your database. Paid courses unlock lessons after enrollment.
+            </div>
+            <div className="heroBadges">
+              <Badge tone="good"><Icon name="shield" /> Stable UI</Badge>
+              <Badge tone="pro">Production layout</Badge>
+              <Badge tone="neutral">Data wiring next</Badge>
+            </div>
+          </div>
+
+          <div className="heroRight">
+            <KPI label="Courses" value={loading ? "…" : kpis.courses} />
+            <KPI label="Subjects" value={loading ? "…" : kpis.subjects} />
+            <KPI label="Paid courses" value={loading ? "…" : kpis.paidCourses} sub={!isSignedIn ? "Sign in to view paid content" : ""} />
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="controls">
+          <div className="segmented" role="tablist" aria-label="Portal sections">
+            {tabDef.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                className={cx("segBtn", tab === t.key && "segBtnActive")}
+                onClick={() => setTab(t.key)}
+                role="tab"
+                aria-selected={tab === t.key}
+              >
+                {t.label}
+                <span className={cx("segCount", tab === t.key && "segCountActive")}>{t.count}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="searchWrap">
+            <div className="searchIcon" aria-hidden="true"><Icon name="search" /></div>
+            <input
+              className="search"
+              value={rawQuery}
+              onChange={(e) => setRawQuery(e.target.value)}
+              placeholder={tab === "subjects" ? "Search subjects…" : "Search courses…"}
+              aria-label="Search"
+            />
+          </div>
+
+          <div className="sortWrap">
+            <button className="btnGhost" type="button" onClick={() => toggleSort("title")}>
+              <Icon name="sort" /> Sort: Title
+            </button>
+            <button className="btnGhost" type="button" onClick={() => toggleSort("updatedAt")}>
+              <Icon name="sort" /> Sort: Updated
+            </button>
+          </div>
+        </div>
+
+        {/* Content Card */}
+        <div className="card">
+          <div className="cardHead">
+            <div>
+              <div className="cardTitle">
+                {tab === "paid" ? "Paid Courses" : tab === "subjects" ? "Subjects" : "Courses"}
+              </div>
+              <div className="cardSub">
+                {tab === "paid"
+                  ? "Shown only when signed in and marked paid in enrollments."
+                  : tab === "subjects"
+                  ? "Browse the subject catalog."
+                  : "Browse and search the course catalog."}
+              </div>
+            </div>
+
+            {viewModel.kind === "courses" ? (
+              <div className="cardMeta">
+                <Badge tone="neutral">{loading ? "…" : viewModel.total} results</Badge>
+                <Badge tone="neutral">Page {viewModel.page} / {viewModel.totalPages}</Badge>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="cardBody">
+            {error ? <div className="errorBox">{error}</div> : null}
+
+            {loading ? (
+              <div className="skeleton">
+                <div className="skRow" />
+                <div className="skRow" />
+                <div className="skRow" />
+                <div className="skRow" />
+              </div>
+            ) : tab === "paid" && !isSignedIn ? (
+              <div className="empty">
+                <div className="emptyTitle">Sign in required</div>
+                <div className="emptyDesc">Sign in to view your paid courses and unlocked lessons.</div>
+                <div style={{ marginTop: 14 }}>
+                  <Link className="btnPrimary" to="/signin">Sign in</Link>
+                </div>
+              </div>
+            ) : viewModel.kind === "subjects" ? (
+              viewModel.list.length === 0 ? (
+                <div className="empty">
+                  <div className="emptyTitle">No subjects</div>
+                  <div className="emptyDesc">Try a different search.</div>
+                </div>
+              ) : (
+                <div className="grid">
+                  {viewModel.list.map((s) => (
+                    <div key={s.subject} className="tile">
+                      <div className="tileTitle">{s.subject}</div>
+                      <div className="tileMeta"><Badge tone="neutral">{s.count} courses</Badge></div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : viewModel.rows.length === 0 ? (
+              <div className="empty">
+                <div className="emptyTitle">No results</div>
+                <div className="emptyDesc">Try another search term or change tabs.</div>
+              </div>
+            ) : (
+              <>
+                <div className="tableWrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th onClick={() => toggleSort("title")} style={{ cursor: "pointer" }}>Course</th>
+                        <th onClick={() => toggleSort("subject")} style={{ cursor: "pointer" }}>Subject</th>
+                        <th onClick={() => toggleSort("level")} style={{ cursor: "pointer" }}>Level</th>
+                        <th onClick={() => toggleSort("access")} style={{ cursor: "pointer" }}>Access</th>
+                        <th onClick={() => toggleSort("updatedAt")} style={{ cursor: "pointer" }}>Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewModel.rows.map((r) => (
+                        <tr key={r.id}>
+                          <td className="tdStrong">{r.title}</td>
+                          <td>{r.subject}</td>
+                          <td>{r.level}</td>
+                          <td>{r.access === "Premium" ? <Badge tone="pro">Premium</Badge> : <Badge tone="good">Free</Badge>}</td>
+                          <td>{r.updatedAt}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="pager">
+                  <button
+                    className="btnGhost"
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={viewModel.page <= 1}
+                  >
+                    Prev
+                  </button>
+                  <div className="pagerMid">
+                    <span className="pagerText">Page</span>
+                    <span className="pagerNum">{viewModel.page}</span>
+                    <span className="pagerText">of</span>
+                    <span className="pagerNum">{viewModel.totalPages}</span>
+                  </div>
+                  <button
+                    className="btnGhost"
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(viewModel.totalPages, p + 1))}
+                    disabled={viewModel.page >= viewModel.totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="footer">AtoZlearn-go • Master Portal • Professional UI</div>
+      </div>
+
+      <style>{`
+        :root{
+          --bg: #f6f8fb;
+          --card: #fff;
+          --text: #0f172a;
+          --muted: rgba(15,23,42,.72);
+          --border: rgba(15,23,42,.10);
+          --shadow: 0 18px 50px rgba(15,23,42,.06);
+          --shadow2: 0 10px 30px rgba(15,23,42,.04);
+          --radius: 18px;
+        }
+
+        .shell{min-height:100vh;background:var(--bg);color:var(--text);}
+        .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 46px;}
+
+        .topbar{
+          position: sticky; top: 10px; z-index: 5;
+          display:flex;align-items:center;justify-content:space-between;gap:12px;
+          padding:14px;border-radius:var(--radius);
+          background:var(--card); border:1px solid var(--border);
+          box-shadow: var(--shadow2);
+          backdrop-filter: blur(10px);
+        }
+        .brand{display:flex;align-items:center;gap:12px;min-width: 240px;}
+        .logo{
+          width:42px;height:42px;border-radius:14px;
+          display:grid;place-items:center;
+          font-weight:1000;letter-spacing:-0.5px;
+          background: rgba(37,99,235,0.10);
+          border: 1px solid rgba(37,99,235,0.22);
+          color: rgba(29,78,216,1);
+          user-select:none;
+        }
+        .brandTitle{font-weight:1000;font-size:15px;line-height:1.1;}
+        .brandSub{font-size:12px;opacity:.7;margin-top:4px;}
+
+        .topActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+        .dot{width:7px;height:7px;border-radius:999px;background:currentColor;opacity:.45;}
+
+        .btnGhost{
+          display:inline-flex;align-items:center;gap:8px;
+          padding:10px 12px;border-radius:14px;
+          border:1px solid rgba(15,23,42,.14);
+          background: rgba(15,23,42,.06);
+          color: var(--text);
+          font-weight:900;font-size:13px;
+          cursor:pointer;
+        }
+        .btnGhost:disabled{opacity:.5;cursor:not-allowed;}
+        .btnPrimary{
+          display:inline-flex;align-items:center;justify-content:center;
+          padding:10px 14px;border-radius:14px;
+          border:1px solid rgba(37,99,235,.22);
+          background: rgba(37,99,235,.12);
+          color: rgba(29,78,216,1);
+          font-weight:1000;font-size:13px;text-decoration:none;
+        }
+
+        .hero{
+          margin-top: 16px;
+          padding: 18px;
+          border-radius: var(--radius);
+          border: 1px solid rgba(37,99,235,.18);
+          background: linear-gradient(180deg, rgba(37,99,235,.11), rgba(37,99,235,.03));
+        }
+        .hero{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;}
+        .heroLeft{max-width: 680px;}
+        .heroTitle{font-size:28px;font-weight:1100;letter-spacing:-0.4px;}
+        .heroDesc{margin-top:8px;font-size:14px;opacity:.78;line-height:1.4;}
+        .heroBadges{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;}
+        .heroRight{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;}
+
+        .kpi{
+          min-width: 170px;
+          padding: 14px;
+          border-radius: 18px;
+          border: 1px solid rgba(15,23,42,.10);
+          background: rgba(255,255,255,.75);
+          box-shadow: var(--shadow2);
+        }
+        .kpiLabel{font-size:12px;opacity:.7;font-weight:800;}
+        .kpiValue{margin-top:10px;font-size:22px;font-weight:1100;line-height:1;}
+        .kpiSub{margin-top:10px;font-size:12px;opacity:.68;}
+
+        .controls{
+          margin-top: 14px;
+          display:flex;
+          gap: 10px;
+          align-items:center;
+          flex-wrap:wrap;
+        }
+        .segmented{
+          display:flex;gap:6px;flex-wrap:wrap;
+          padding: 6px;
+          border-radius: 999px;
+          border: 1px solid rgba(15,23,42,.10);
+          background: rgba(255,255,255,.70);
+        }
+        .segBtn{
+          display:inline-flex;align-items:center;gap:8px;
+          padding: 10px 12px;
+          border-radius: 999px;
+          border: 1px solid transparent;
+          background: transparent;
+          cursor:pointer;
+          font-weight: 1000;
+          font-size: 13px;
+          color: rgba(15,23,42,.92);
+        }
+        .segBtnActive{
+          background: rgba(15,23,42,.92);
+          color: white;
+        }
+        .segCount{
+          padding: 4px 8px;
+          border-radius: 999px;
+          border: 1px solid rgba(15,23,42,.14);
+          background: rgba(15,23,42,.06);
+          font-size: 12px;
+          font-weight: 1000;
+          opacity: .8;
+        }
+        .segCountActive{
+          border-color: rgba(255,255,255,.18);
+          background: rgba(255,255,255,.12);
+          color: white;
+          opacity: 1;
+        }
+
+        .searchWrap{
+          position: relative;
+          flex: 1;
+          min-width: 240px;
+          max-width: 520px;
+        }
+        .searchIcon{
+          position:absolute;left:12px;top:50%;transform:translateY(-50%);
+          opacity:.55;
+          pointer-events:none;
+        }
+        .search{
+          width:100%;
+          padding: 12px 14px 12px 40px;
+          border-radius: 14px;
+          border: 1px solid rgba(15,23,42,.12);
+          outline: none;
+          background: rgba(255,255,255,.92);
+          font-weight: 800;
+          box-shadow: 0 6px 20px rgba(15,23,42,.03);
+        }
+
+        .sortWrap{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+
+        .card{
+          margin-top: 12px;
+          border-radius: var(--radius);
+          border: 1px solid var(--border);
+          background: var(--card);
+          box-shadow: var(--shadow);
+          overflow:hidden;
+        }
+        .cardHead{
+          padding: 16px;
+          display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+          border-bottom: 1px solid rgba(15,23,42,.08);
+          background: linear-gradient(180deg, rgba(15,23,42,.02), rgba(15,23,42,0));
+        }
+        .cardTitle{font-size:16px;font-weight:1100;}
+        .cardSub{margin-top:6px;font-size:12px;opacity:.7;line-height:1.35;}
+        .cardMeta{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+
+        .cardBody{padding: 16px;}
+
+        .errorBox{
+          border: 1px solid rgba(255,100,100,.35);
+          background: rgba(255,50,50,.08);
+          border-radius: 16px;
+          padding: 12px 14px;
+          margin-bottom: 12px;
+          font-weight: 900;
+        }
+
+        .skeleton{border-radius: 16px;background: rgba(15,23,42,.02);padding: 14px;border: 1px solid rgba(15,23,42,.06);}
+        .skRow{height: 14px;border-radius: 999px;background: rgba(15,23,42,.06);margin: 12px 0;}
+
+        .empty{
+          border-radius: 16px;
+          border: 1px dashed rgba(15,23,42,.18);
+          background: rgba(15,23,42,.03);
+          padding: 20px;
+          text-align:center;
+        }
+        .emptyTitle{font-weight:1100;font-size:14px;}
+        .emptyDesc{margin-top:6px;font-size:12px;opacity:.75;line-height:1.35;}
+
+        .grid{display:grid;grid-template-columns:repeat(12, 1fr);gap:12px;}
+        .tile{
+          grid-column: span 4;
+          border-radius: 16px;
+          border: 1px solid rgba(15,23,42,.10);
+          background: rgba(255,255,255,.92);
+          padding: 14px;
+          box-shadow: 0 10px 30px rgba(15,23,42,.03);
+        }
+        .tileTitle{font-weight:1100;}
+        .tileMeta{margin-top:10px;}
+        @media (max-width: 900px){ .tile{grid-column: span 6;} }
+        @media (max-width: 620px){ .tile{grid-column: span 12;} }
+
+        .tableWrap{overflow-x:auto;border:1px solid rgba(15,23,42,.08);border-radius:16px;}
+        .table{width:100%;border-collapse:separate;border-spacing:0;background:white;}
+        .table thead th{
+          text-align:left;
+          font-size:12px;
+          opacity:.7;
+          padding: 12px 12px;
+          border-bottom: 1px solid rgba(15,23,42,.08);
+          background: rgba(15,23,42,.02);
+          user-select:none;
+        }
+        .table tbody td{
+          padding: 12px 12px;
+          border-bottom: 1px solid rgba(15,23,42,.06);
+          font-size: 13px;
+        }
+        .table tbody tr:hover td{background: rgba(37,99,235,.04);}
+        .tdStrong{font-weight:1000;}
+
+        .pager{
+          display:flex;align-items:center;justify-content:space-between;gap:10px;
+          margin-top: 12px;
+        }
+        .pagerMid{display:flex;align-items:center;gap:8px;}
+        .pagerText{font-size:12px;opacity:.7;font-weight:900;}
+        .pagerNum{font-size:12px;font-weight:1100;}
+
+        .footer{margin-top:18px;font-size:12px;opacity:.6;text-align:center;}
+      `}</style>
+    </div>
+  );
+}

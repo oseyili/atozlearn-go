@@ -1,27 +1,15 @@
-import React from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
-
+﻿import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import PortalPage from "./pages/PortalPage.jsx";
-import CoursePage from "./pages/CoursePage.jsx";
 
-export default function App() {
+export function App() {
   return (
     <Routes>
-      {/* Default entry */}
       <Route path="/" element={<Navigate to="/portal" replace />} />
-
-      {/* Main portal */}
       <Route path="/portal" element={<PortalPage />} />
-
-      {/* Course page: unlock + content linked via RPCs */}
-      <Route path="/course/:courseId" element={<CoursePage />} />
-
-      {/* Optional success/cancel routes after Stripe */}
-      <Route path="/success" element={<Navigate to="/portal" replace />} />
-      <Route path="/cancel" element={<Navigate to="/portal" replace />} />
-
-      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/portal" replace />} />
     </Routes>
   );
 }
+
+export default App;

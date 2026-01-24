@@ -1,0 +1,98 @@
+﻿import React, { Suspense } from "react";
+import { Routes, Route, Navigate, Link } from "react-router-dom";
+import PortalPage from "./pages/PortalPage.jsx";
+
+// Vite feature: only includes files that actually exist at build time.
+const modules = import.meta.glob("./pages/*.jsx");
+
+function OptionalPage({ name, title, hint }) {
+  const key = `./pages/${name}.jsx`;
+  const loader = modules[key];
+
+  if (!loader) {
+    return (
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
+        <div style={{
+          border: "1px solid rgba(15,23,42,.10)",
+          borderRadius: 18,
+          background: "rgba(255,255,255,.92)",
+          boxShadow: "0 18px 40px rgba(15,23,42,.08)",
+          padding: 18
+        }}>
+          <div style={{ fontWeight: 1000, fontSize: 18 }}>{title}</div>
+          <div style={{ opacity: .78, marginTop: 6 }}>{hint}</div>
+          <div style={{ marginTop: 14 }}>
+            <Link className="btn btnGhost" to="/portal">Back to Portal</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const C = React.lazy(loader);
+
+  return (
+    <Suspense fallback={<div style={{ padding: 24, opacity: .75 }}>Loading…</div>}>
+      <C />
+    </Suspense>
+  );
+}
+
+// Named export (extra-safe)
+export function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/portal" replace />} />
+      <Route path="/portal" element={<PortalPage />} />
+
+      <Route
+        path="/login"
+        element={
+          <OptionalPage
+            name="LoginPage"
+            title="Login Page"
+            hint="If you want a custom login UI, create src/pages/LoginPage.jsx."
+          />
+        }
+      />
+
+      <Route
+        path="/checkout"
+        element={
+          <OptionalPage
+            name="CheckoutPage"
+            title="Checkout"
+            hint="Create src/pages/CheckoutPage.jsx to connect Stripe checkout flow."
+          />
+        }
+      />
+
+      <Route
+        path="/course/:id"
+        element={
+          <OptionalPage
+            name="CoursePage"
+            title="Course"
+            hint="Create src/pages/CoursePage.jsx to show lessons/content for a course."
+          />
+        }
+      />
+
+      <Route
+        path="/admin/payments"
+        element={
+          <OptionalPage
+            name="AdminPaymentsAuditPage"
+            title="Admin Payments"
+            hint="Create src/pages/AdminPaymentsAuditPage.jsx for audit UI."
+          />
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/portal" replace />} />
+    </Routes>
+  );
+}
+
+// Default export (this is what main.jsx expects)
+export default App;

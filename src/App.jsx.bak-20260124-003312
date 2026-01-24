@@ -1,0 +1,82 @@
+﻿import React from "react";
+import { Routes, Route, Navigate, Link } from "react-router-dom";
+
+import PortalPage from "./pages/PortalPage.jsx";
+
+// These may or may not exist in your repo; we load them safely.
+let LoginPage = null;
+let CoursePage = null;
+let CheckoutPage = null;
+let AdminPaymentsAuditPage = null;
+
+try { LoginPage = (await import("./pages/LoginPage.jsx")).default; } catch {}
+try { CoursePage = (await import("./pages/CoursePage.jsx")).default; } catch {}
+try { CheckoutPage = (await import("./pages/CheckoutPage.jsx")).default; } catch {}
+try { AdminPaymentsAuditPage = (await import("./pages/AdminPaymentsAuditPage.jsx")).default; } catch {}
+
+function MissingPage({ title, hint }) {
+  return (
+    <div style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
+      <div style={{
+        border: "1px solid rgba(15,23,42,.10)",
+        borderRadius: 18,
+        background: "rgba(255,255,255,.8)",
+        boxShadow: "0 18px 40px rgba(15,23,42,.06)",
+        padding: 18
+      }}>
+        <div style={{ fontWeight: 1000, fontSize: 18 }}>{title}</div>
+        <div style={{ opacity: .78, marginTop: 6 }}>{hint}</div>
+        <div style={{ marginTop: 14 }}>
+          <Link className="btn btnGhost" to="/portal">Back to Portal</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/portal" replace />} />
+      <Route path="/portal" element={<PortalPage />} />
+
+      <Route
+        path="/login"
+        element={
+          LoginPage
+            ? <LoginPage />
+            : <MissingPage title="Login page not found" hint="Create src/pages/LoginPage.jsx or restore it from your previous working branch." />
+        }
+      />
+
+      <Route
+        path="/course/:id"
+        element={
+          CoursePage
+            ? <CoursePage />
+            : <MissingPage title="Course page not found" hint="Create src/pages/CoursePage.jsx or restore it from your previous working branch." />
+        }
+      />
+
+      <Route
+        path="/checkout"
+        element={
+          CheckoutPage
+            ? <CheckoutPage />
+            : <MissingPage title="Checkout page not found" hint="Create src/pages/CheckoutPage.jsx or restore it from your previous working branch." />
+        }
+      />
+
+      <Route
+        path="/admin/payments"
+        element={
+          AdminPaymentsAuditPage
+            ? <AdminPaymentsAuditPage />
+            : <MissingPage title="Admin payments page not found" hint="Create src/pages/AdminPaymentsAuditPage.jsx or restore it from your previous working branch." />
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/portal" replace />} />
+    </Routes>
+  );
+}
