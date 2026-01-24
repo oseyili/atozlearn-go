@@ -30,3 +30,4 @@ ops/.secrets.env
 fix-all.ps1
 install-autopilot.ps1
 
+ops/doctor/heartbeat.txt
