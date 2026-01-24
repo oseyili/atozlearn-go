@@ -1,5 +1,5 @@
 {
-  "ts": "2026-01-24T13:37:50.640Z",
+  "ts": "2026-01-24T13:51:31.302Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -20,25 +20,25 @@
       "bodyPreview": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" />\n    <meta name=\"viewport\" content=\"width=device"
     },
     "health_OPTIONS": {
-      "ok": false,
-      "status": 404,
-      "statusText": "Not Found",
-      "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"NOT_FOUND\",\"message\":\"Requested function was not found\"}"
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
+      "contentType": "text/plain;charset=UTF-8",
+      "bodyPreview": "ok"
     },
     "health_GET": {
-      "ok": false,
-      "status": 404,
-      "statusText": "Not Found",
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"NOT_FOUND\",\"message\":\"Requested function was not found\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-01-24T13:51:32.489Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
-      "status": 404,
-      "statusText": "Not Found",
+      "status": 401,
+      "statusText": "Unauthorized",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"NOT_FOUND\",\"message\":\"Requested function was not found\"}"
+      "bodyPreview": "{\"code\":401,\"message\":\"Missing authorization header\"}"
     },
     "stripe_account": {
       "ok": true,
