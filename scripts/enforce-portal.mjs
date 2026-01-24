@@ -1,3 +1,17 @@
+﻿import { existsSync, mkdirSync, copyFileSync } from "node:fs";
+import { dirname } from "node:path";
+
+if (process.env.ENFORCE_PORTAL !== "1") {
+  console.log("[enforce-portal] skipped (set ENFORCE_PORTAL=1 to enable)");
+  process.exit(0);
+}
+
+function copy(from, to) {
+  if (!existsSync(from)) throw new Error("Missing: " + from);
+  mkdirSync(dirname(to), { recursive: true });
+  copyFileSync(from, to);
+}
+
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -16,3 +30,4 @@ copy(srcJs, outJs);
 copy(srcCss, outCss);
 
 console.log("AUTO | PORTAL | ENFORCE | HEAL | OK");
+
