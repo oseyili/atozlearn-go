@@ -8,7 +8,7 @@ export default function MasterPortal() {
   const [subjects, setSubjects] = useState([]);
   const [paid, setPaid] = useState([]);
 
-  const load = async () => {
+  useEffect(() => { (async () => {
     setErr(""); setLoading(true);
     try {
       const { data: h, error: he } = await supabase.from("v_portal_home").select("*").single();
@@ -27,16 +27,14 @@ export default function MasterPortal() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => { load(); }, []);
+  })(); }, []);
 
   return (
     <div style={{ minHeight:"100vh", background:"#070A12", color:"#fff", fontFamily:"ui-sans-serif,system-ui" }}>
       <div style={{ maxWidth:1100, margin:"0 auto", padding:"28px 16px" }}>
         <div style={{ border:"1px solid rgba(255,255,255,.08)", background:"rgba(255,255,255,.04)", borderRadius:18, padding:18 }}>
-          <div style={{ fontSize:34, fontWeight:950 }}>Master Portal</div>
-          <div style={{ opacity:.75, marginTop:6 }}>Data source: v_portal_home / v_subjects / v_paid_courses</div>
+          <div style={{ fontSize:36, fontWeight:950 }}>Master Portal</div>
+          <div style={{ opacity:.72, marginTop:6 }}>Source: v_portal_home / v_subjects / v_paid_courses</div>
           <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginTop:12 }}>
             <span style={chip}>Courses: {loading ? "…" : home.active_courses}</span>
             <span style={chip}>Subjects: {loading ? "…" : home.subjects}</span>
@@ -49,7 +47,7 @@ export default function MasterPortal() {
           <div style={{ border:"1px solid rgba(255,255,255,.08)", background:"rgba(255,255,255,.03)", borderRadius:18, padding:18 }}>
             <div style={{ fontWeight:950, fontSize:18, marginBottom:10 }}>Subjects</div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:12 }}>
-              {(subjects || []).map(s => (
+              {(subjects||[]).map(s => (
                 <div key={s.subject} style={tile}>
                   <div style={{ fontWeight:950 }}>{s.subject}</div>
                   <div style={{ opacity:.7, fontSize:13 }}>{s.courses} courses</div>
@@ -61,7 +59,7 @@ export default function MasterPortal() {
           <div style={{ border:"1px solid rgba(255,255,255,.08)", background:"rgba(255,255,255,.03)", borderRadius:18, padding:18 }}>
             <div style={{ fontWeight:950, fontSize:18, marginBottom:10 }}>Paid Courses</div>
             <div style={{ display:"grid", gap:10 }}>
-              {(paid || []).map(c => (
+              {(paid||[]).map(c => (
                 <div key={c.id} style={row}>
                   <div style={{ minWidth:0 }}>
                     <div style={{ fontWeight:950, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title || "Untitled course"}</div>
@@ -70,7 +68,7 @@ export default function MasterPortal() {
                   <span style={chip}>{c.subject || "General"}</span>
                 </div>
               ))}
-              {!loading && (paid?.length || 0) === 0 ? <div style={{ opacity:.7 }}>No paid courses returned by v_paid_courses.</div> : null}
+              {!loading && (paid?.length||0)===0 ? <div style={{ opacity:.7 }}>No paid courses returned.</div> : null}
             </div>
           </div>
         </div>
@@ -79,6 +77,6 @@ export default function MasterPortal() {
   );
 }
 
-const chip = { display:"inline-flex", padding:"6px 10px", borderRadius:999, border:"1px solid rgba(255,255,255,.10)", background:"rgba(255,255,255,.05)", fontSize:12, opacity:.92 };
-const tile = { padding:14, borderRadius:16, border:"1px solid rgba(255,255,255,.08)", background:"rgba(255,255,255,.03)" };
-const row = { display:"flex", justifyContent:"space-between", gap:14, alignItems:"center", padding:14, borderRadius:16, border:"1px solid rgba(255,255,255,.08)", background:"rgba(255,255,255,.03)" };
+const chip={display:"inline-flex",padding:"6px 10px",borderRadius:999,border:"1px solid rgba(255,255,255,.10)",background:"rgba(255,255,255,.05)",fontSize:12,opacity:.92};
+const tile={padding:14,borderRadius:16,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.03)"};
+const row={display:"flex",justifyContent:"space-between",gap:14,alignItems:"center",padding:14,borderRadius:16,border:"1px solid rgba(255,255,255,.08)",background:"rgba(255,255,255,.03)"};
