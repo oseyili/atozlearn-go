@@ -1,3 +1,4 @@
+const HEALTHCHECK_API_KEY = Deno.env.get("HEALTHCHECK_API_KEY") ?? null;
 ﻿// FORCE-DEPLOY MARKER: create-checkout v6 2026-01-18
 // Repair rule: attach {user_id, course_id} to Stripe metadata for webhook unlock.
 
@@ -21,7 +22,23 @@ function json(body: unknown, status = 200) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return json({ ok: true, marker: "create-checkout-v6" }, 200);
+  
+// Deterministic healthcheck bypass (does not require JWT / Stripe)
+try {
+  const hcKey = req.headers.get("x-healthcheck-key") || "";
+  if (HEALTHCHECK_API_KEY && hcKey === HEALTHCHECK_API_KEY) {
+    const body = await req.json().catch(() => ({}));
+    if (body?.healthcheck === true) {
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+  }
+} catch (_) {}
+
+const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+if (req.method === "OPTIONS") return json({ ok: true, marker: "create-checkout-v6" }, 200);
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   let payload: any;
