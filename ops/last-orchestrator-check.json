@@ -1,5 +1,5 @@
 {
-  "ts": "2026-04-22T21:36:26.570Z",
+  "ts": "2026-04-22T21:36:47.254Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -31,7 +31,7 @@
       "status": 200,
       "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-04-22T21:36:27.218Z\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-04-22T21:36:47.765Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
