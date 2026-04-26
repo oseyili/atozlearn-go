@@ -1,5 +1,5 @@
 {
-  "ts": "2026-04-26T18:08:24.705Z",
+  "ts": "2026-04-26T19:13:27.028Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -20,18 +20,18 @@
       "bodyPreview": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n<"
     },
     "health_OPTIONS": {
-      "ok": true,
-      "status": 200,
-      "statusText": "OK",
-      "contentType": "text/plain;charset=UTF-8",
-      "bodyPreview": "ok"
+      "ok": false,
+      "status": 503,
+      "statusText": "Service Unavailable",
+      "contentType": "application/json",
+      "bodyPreview": "{\"code\":\"SUPABASE_EDGE_RUNTIME_ERROR\",\"message\":\"Service is temporarily unavailable\"}"
     },
     "health_GET": {
       "ok": true,
       "status": 200,
       "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-04-26T18:08:25.339Z\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-04-26T19:13:27.533Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
