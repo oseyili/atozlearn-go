@@ -1,5 +1,5 @@
 {
-  "ts": "2026-04-26T17:29:46.440Z",
+  "ts": "2026-04-26T17:30:09.746Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -31,14 +31,14 @@
       "status": 200,
       "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-04-26T17:29:48.748Z\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-04-26T17:30:10.482Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
-      "status": 401,
-      "statusText": "Unauthorized",
+      "status": 503,
+      "statusText": "Service Unavailable",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}"
+      "bodyPreview": "{\"code\":\"SUPABASE_EDGE_RUNTIME_ERROR\",\"message\":\"Service is temporarily unavailable\"}"
     },
     "stripe_account": {
       "ok": true,
