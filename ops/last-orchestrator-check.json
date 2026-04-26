@@ -1,5 +1,5 @@
 {
-  "ts": "2026-04-26T11:52:50.346Z",
+  "ts": "2026-04-26T11:53:10.786Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -27,11 +27,11 @@
       "bodyPreview": "ok"
     },
     "health_GET": {
-      "ok": false,
-      "status": 503,
-      "statusText": "Service Unavailable",
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"SUPABASE_EDGE_RUNTIME_ERROR\",\"message\":\"Service is temporarily unavailable\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-04-26T11:53:11.349Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
