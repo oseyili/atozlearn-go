@@ -1,5 +1,5 @@
 {
-  "ts": "2026-06-18T14:11:30.584Z",
+  "ts": "2026-06-18T14:12:01.080Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -27,11 +27,11 @@
       "bodyPreview": "ok"
     },
     "health_GET": {
-      "ok": true,
-      "status": 200,
-      "statusText": "OK",
+      "ok": false,
+      "status": 503,
+      "statusText": "Service Unavailable",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-06-18T14:11:31.094Z\"}"
+      "bodyPreview": "{\"code\":\"LOAD_FUNCTION_ERROR\",\"message\":\"Failed to load edge function\"}"
     },
     "checkout_bypass": {
       "ok": false,
