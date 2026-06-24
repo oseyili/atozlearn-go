@@ -1,5 +1,5 @@
 {
-  "ts": "2026-06-23T23:43:17.700Z",
+  "ts": "2026-06-24T01:47:50.995Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -20,25 +20,25 @@
       "bodyPreview": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n<"
     },
     "health_OPTIONS": {
-      "ok": true,
-      "status": 200,
-      "statusText": "OK",
-      "contentType": "text/plain;charset=UTF-8",
-      "bodyPreview": "ok"
+      "ok": false,
+      "status": 503,
+      "statusText": "Service Unavailable",
+      "contentType": "application/json",
+      "bodyPreview": "{\"code\":\"LOAD_FUNCTION_ERROR\",\"message\":\"Failed to load edge function\"}"
     },
     "health_GET": {
-      "ok": true,
-      "status": 200,
-      "statusText": "OK",
+      "ok": false,
+      "status": 503,
+      "statusText": "Service Unavailable",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-06-23T23:43:18.079Z\"}"
+      "bodyPreview": "{\"code\":\"LOAD_FUNCTION_ERROR\",\"message\":\"Failed to load edge function\"}"
     },
     "checkout_bypass": {
       "ok": false,
-      "status": 401,
-      "statusText": "Unauthorized",
+      "status": 503,
+      "statusText": "Service Unavailable",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"UNAUTHORIZED_NO_AUTH_HEADER\",\"message\":\"Missing authorization header\"}"
+      "bodyPreview": "{\"code\":\"LOAD_FUNCTION_ERROR\",\"message\":\"Failed to load edge function\"}"
     },
     "stripe_account": {
       "ok": true,
