@@ -1,5 +1,5 @@
 {
-  "ts": "2026-06-29T16:07:45.114Z",
+  "ts": "2026-06-29T18:21:58.983Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -21,17 +21,17 @@
     },
     "health_OPTIONS": {
       "ok": false,
-      "status": 503,
-      "statusText": "Service Unavailable",
+      "status": 404,
+      "statusText": "Not Found",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"LOAD_FUNCTION_ERROR\",\"message\":\"Failed to load edge function\"}"
+      "bodyPreview": "{\"code\":\"NOT_FOUND_FUNCTION_BLOB\",\"message\":\"Requested function was not found\"}"
     },
     "health_GET": {
       "ok": false,
-      "status": 503,
-      "statusText": "Service Unavailable",
+      "status": 404,
+      "statusText": "Not Found",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"LOAD_FUNCTION_ERROR\",\"message\":\"Failed to load edge function\"}"
+      "bodyPreview": "{\"code\":\"NOT_FOUND_FUNCTION_BLOB\",\"message\":\"Requested function was not found\"}"
     },
     "checkout_bypass": {
       "ok": false,
