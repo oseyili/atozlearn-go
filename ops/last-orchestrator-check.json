@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-07T17:01:16.052Z",
+  "ts": "2026-07-07T17:01:49.428Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
