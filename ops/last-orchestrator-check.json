@@ -1,5 +1,5 @@
 {
-  "ts": "2026-07-11T04:31:58.484Z",
+  "ts": "2026-07-11T06:57:14.157Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -20,18 +20,18 @@
       "bodyPreview": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n<"
     },
     "health_OPTIONS": {
-      "ok": true,
-      "status": 200,
-      "statusText": "OK",
-      "contentType": "text/plain;charset=UTF-8",
-      "bodyPreview": "ok"
+      "ok": false,
+      "status": 404,
+      "statusText": "Not Found",
+      "contentType": "application/json",
+      "bodyPreview": "{\"code\":\"NOT_FOUND_FUNCTION_BLOB\",\"message\":\"Requested function was not found\"}"
     },
     "health_GET": {
-      "ok": true,
-      "status": 200,
-      "statusText": "OK",
+      "ok": false,
+      "status": 404,
+      "statusText": "Not Found",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-07-11T04:31:58.965Z\"}"
+      "bodyPreview": "{\"code\":\"NOT_FOUND_FUNCTION_BLOB\",\"message\":\"Requested function was not found\"}"
     },
     "checkout_bypass": {
       "ok": false,
