@@ -1,5 +1,5 @@
 {
-  "ts": "2026-08-01T12:07:57.893Z",
+  "ts": "2026-08-01T12:08:51.694Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -41,10 +41,10 @@
       "bodyPreview": "{\"code\":\"NOT_FOUND_FUNCTION_BLOB\",\"message\":\"Requested function was not found\"}"
     },
     "stripe_account": {
-      "ok": false,
-      "status": 504,
-      "statusText": "Gateway Timeout",
-      "bodyPreview": "{\n  \"error\": {\n    \"message\": \"Error while communicating with one of our backends.  Sorry about that!  We have been notified of the problem.  If you have any questions, we can help"
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
+      "bodyPreview": "{\n  \"id\": \"acct_1SkyxIDZOfW62KCw\",\n  \"object\": \"account\",\n  \"business_profile\": {\n    \"annual_revenue\": null,\n    \"estimated_worker_count\": null,\n    \"mcc\": \"8299\",\n    \"minority_o"
     }
   }
 }
