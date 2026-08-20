@@ -1,5 +1,5 @@
 {
-  "ts": "2026-08-20T17:05:24.522Z",
+  "ts": "2026-08-20T17:42:08.783Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -27,11 +27,11 @@
       "bodyPreview": "{\"code\":\"NOT_FOUND_FUNCTION_BLOB\",\"message\":\"Requested function was not found\"}"
     },
     "health_GET": {
-      "ok": false,
-      "status": 404,
-      "statusText": "Not Found",
+      "ok": true,
+      "status": 200,
+      "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"code\":\"NOT_FOUND_FUNCTION_BLOB\",\"message\":\"Requested function was not found\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-08-20T17:42:09.446Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
