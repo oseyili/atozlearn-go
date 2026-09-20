@@ -1,5 +1,5 @@
 {
-  "ts": "2026-09-20T11:52:02.631Z",
+  "ts": "2026-09-20T11:52:41.919Z",
   "secretsPresent": {
     "PROD_BASE_URL": true,
     "SUPABASE_FUNCTIONS_BASE": true,
@@ -14,7 +14,10 @@
   "results": {
     "frontend": {
       "ok": false,
-      "error": "fetch failed"
+      "status": 503,
+      "statusText": "Service Unavailable",
+      "contentType": "text/html; charset=utf-8",
+      "bodyPreview": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Service Suspended</title>\n<"
     },
     "health_OPTIONS": {
       "ok": true,
@@ -28,7 +31,7 @@
       "status": 200,
       "statusText": "OK",
       "contentType": "application/json",
-      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-09-20T11:52:03.130Z\"}"
+      "bodyPreview": "{\"ok\":true,\"ts\":\"2026-09-20T11:52:42.360Z\"}"
     },
     "checkout_bypass": {
       "ok": false,
